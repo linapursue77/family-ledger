@@ -30,6 +30,15 @@ export const useAuthStore = defineStore('auth', {
       if (this.refresh) localStorage.setItem('fl_refresh', this.refresh)
       await this.fetchMe()
     },
+    /** 注册即登录：后端返回 token，存好后再拉一次家庭上下文 */
+    async register(payload) {
+      const d = await authApi.register(payload)
+      this.token = d.token.access
+      this.refresh = d.token.refresh || ''
+      localStorage.setItem('fl_token', this.token)
+      if (this.refresh) localStorage.setItem('fl_refresh', this.refresh)
+      await this.fetchMe()
+    },
     async fetchMe() {
       const d = await authApi.me()
       this.user = d.user

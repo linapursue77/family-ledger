@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { familyApi } from '@/api'
 import ConfirmSheet from '@/components/ConfirmSheet.vue'
@@ -126,6 +126,9 @@ const permForm = reactive({ ...DEFAULT_PERMS })
 
 const memberTarget = ref(null)
 const memberForm = reactive({ nickname: '', book_type: 'wife' })
+
+// 从 Mine 的「主账号设置」跳转过来时，滚到成员区（转让入口就在那里）
+const memberSec = ref(null)
 
 const thrForm = reactive({ small: 500, notify: 2000, approve: 5000 })
 
@@ -420,6 +423,9 @@ onMounted(async () => {
   // 从 Mine 的「邀请成员 / 家庭成员 / 协商阈值」跳转过来时，直接定位到对应区块
   if (canManage.value && route.query.invite === '1') openInvite()
   if (route.query.view === 'threshold' && canManage.value) openThreshold()
+  if (route.query.view === 'members') {
+    nextTick(() => memberSec.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
 })
 </script>
 
@@ -444,7 +450,7 @@ onMounted(async () => {
       </div>
 
       <!-- 成员与授权 -->
-      <div class="card sec">
+      <div ref="memberSec" class="card sec">
         <div class="sec-title">
           成员与授权
           <span v-if="canManage" class="sec-note">点「授权」调整可见范围</span>

@@ -12,13 +12,17 @@
 
 ## 先看效果
 
-| 首页 · 三本账与净资产 | 月度报告 |
-| :---: | :---: |
-| ![首页](full.png) | ![报告](report.png) |
+| 首页 · 净资产 | 报告 · 智能分析 | 报告 · 分类与趋势 |
+| :---: | :---: | :---: |
+| ![首页](docs/screenshots/home.png) | ![智能分析](docs/screenshots/report-ai.png) | ![趋势](docs/screenshots/report-trend.png) |
 
-| 分类与流水分析 | 资产与趋势 |
-| :---: | :---: |
-| ![报告2](report2.png) | ![报告3](report3.png) |
+| 账户 · 三本账 | 借钱来往 | 家庭权限与阈值 |
+| :---: | :---: | :---: |
+| ![账户](docs/screenshots/accounts.png) | ![借钱来往](docs/screenshots/loans.png) | ![家庭](docs/screenshots/family.png) |
+
+| 记一笔 | 账单导入 | 我的 · 隐私额度与 AI |
+| :---: | :---: | :---: |
+| ![记一笔](docs/screenshots/record.png) | ![导入](docs/screenshots/import.png) | ![我的](docs/screenshots/mine.png) |
 
 ---
 
@@ -120,14 +124,19 @@ Vite 已配置 `/api` 代理到 `127.0.0.1:8001`，无需额外配置跨域。
 
 ### 4. 登录
 
-打开 `http://127.0.0.1:5173` 注册即可。想快速看效果，用内置脚本生成一对演示夫妻：
+打开 `http://127.0.0.1:5173`，使用演示账号登录：
+
+| 账号 | 密码 | 角色 |
+| --- | --- | --- |
+| `13800138000` | `test123456` | 老公（主账号） |
+| `13800138001` | `test123456` | 老婆（子账号） |
+
+想复现 README 截图里的效果，一条命令造出完整演示数据（7 个账户、6 个月 300+ 笔流水、借钱台账、资产快照）：
 
 ```bash
 cd backend
-python manage.py seed_demo_family
+python manage.py seed_showcase          # 加 --reset 可清空重建
 ```
-
-演示账号：`13800138000 / test123456`（老公）、`13800138001 / test123456`（老婆），两人已在同一家庭下。
 
 ### 其他常用命令
 

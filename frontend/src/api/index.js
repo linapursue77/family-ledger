@@ -32,6 +32,8 @@ function unwrap(promise) {
 
 export const authApi = {
   login: (payload) => unwrap(client.post('/auth/login/', payload)),
+  // 注册：后端会自动建一个新家庭并把注册人设为主账号，返回 token 直接进首页
+  register: (payload) => unwrap(client.post('/auth/register/', payload)),
   me: () => unwrap(client.get('/auth/me/')),
   // 个人资料：昵称 / 头像 / 隐私额度（每人一份，保存即生效）
   updateProfile: (payload) => unwrap(client.patch('/auth/profile/', payload)),

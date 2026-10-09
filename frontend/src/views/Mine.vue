@@ -140,6 +140,13 @@ const memberCountText = computed(() => {
   if (!famInfo.value) return ''
   return `${famInfo.value.members.length}/${famInfo.value.member_limit} 人`
 })
+// 主账号设置：显示「我是主账号」或当前主账号是谁，让人一眼知道管理权在谁手上
+const ownerText = computed(() => {
+  const list = famInfo.value?.members || []
+  const owner = list.find((m) => m.role === 'owner')
+  if (auth.isOwner) return '我是主账号'
+  return owner ? `当前：${owner.nickname || owner.username}` : '未设置'
+})
 const inviteText = computed(() => {
   const n = famInfo.value?.members?.length || 0
   return n >= (famInfo.value?.member_limit || 5) ? '已满' : '›'
@@ -449,6 +456,13 @@ onMounted(() => {
         <span class="menu-icon">👨👩👧</span>
         <span class="menu-text">家庭成员</span>
         <span class="menu-value">{{ memberCountText }}</span>
+        <span class="menu-arrow">›</span>
+      </div>
+      <!-- 主账号设置：注册的人默认就是主账号，可在这里把管理权转让给对方 -->
+      <div class="menu-item" @click="router.push({ path: '/family', query: { view: 'members' } })">
+        <span class="menu-icon">👑</span>
+        <span class="menu-text">主账号设置</span>
+        <span class="menu-value">{{ ownerText }}</span>
         <span class="menu-arrow">›</span>
       </div>
     </div>
