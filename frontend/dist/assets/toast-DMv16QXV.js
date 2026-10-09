@@ -1,0 +1,1 @@
+let t=null,e=null;function i(o,s=2200){typeof document>"u"||(t||(t=document.createElement("div"),t.className="app-toast",document.body.appendChild(t)),t.textContent=String(o??""),t.classList.remove("show"),t.offsetWidth,t.classList.add("show"),clearTimeout(e),e=setTimeout(()=>t.classList.remove("show"),s))}export{i as t};

@@ -1,0 +1,64 @@
+<view class="page">
+  <!-- 用户卡 -->
+  <view class="card user-card">
+    <view class="avatar">{{user.nickname ? user.nickname[0] : '财'}}</view>
+    <view class="user-info">
+      <text class="user-name">{{user.nickname || '未设置昵称'}}</text>
+      <text class="user-family text-muted">{{family.name || '我的家庭'}}</text>
+    </view>
+  </view>
+
+  <!-- 账户列表 -->
+  <view class="card section">
+    <view class="section-head">
+      <text class="section-title">我的账户</text>
+      <text class="add-btn" bindtap="openAdd">＋ 新增</text>
+    </view>
+    <view class="list-item" wx:for="{{accounts}}" wx:key="id">
+      <text class="acc-icon">{{item.icon}}</text>
+      <view class="acc-info">
+        <text class="acc-name">{{item.name}}</text>
+        <text class="acc-book text-muted">{{item.book_type}}</text>
+      </view>
+      <text class="acc-balance">¥{{item.balanceText}}</text>
+    </view>
+    <view wx:if="{{!accounts.length}}" class="empty">暂无账户，点击右上角新增</view>
+  </view>
+
+  <view class="logout-area">
+    <button class="btn-logout" bindtap="onLogout">退出登录</button>
+  </view>
+
+  <!-- 新增账户弹窗 -->
+  <view wx:if="{{showAdd}}" class="sheet-mask" bindtap="closeAdd">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">新增账户</text>
+        <text class="sheet-close" bindtap="closeAdd">×</text>
+      </view>
+      <view class="field-row">
+        <text class="field-label">名称</text>
+        <input placeholder="如：招商银行" value="{{newName}}" bindinput="onName" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">类型</text>
+        <picker range="{{accountTypes}}" range-key="label" value="{{newTypeIndex}}" bindchange="onType">
+          <view class="field-value">{{accountTypes[newTypeIndex].label}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">账本</text>
+        <picker range="{{bookTypes}}" range-key="label" value="{{newBookIndex}}" bindchange="onBook">
+          <view class="field-value">{{bookTypes[newBookIndex].label}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">余额</text>
+        <input type="digit" placeholder="0.00" value="{{newBalance}}" bindinput="onBalance" />
+      </view>
+      <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSaveAccount">
+        {{saving ? '保存中…' : '保存'}}
+      </button>
+    </view>
+  </view>
+</view>

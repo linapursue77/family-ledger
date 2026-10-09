@@ -1,0 +1,78 @@
+.preset-bar {
+  white-space: nowrap;
+  padding: 16rpx 24rpx;
+}
+.preset-bar .chip {
+  display: inline-block;
+}
+.summary-card {
+  padding: 28rpx;
+}
+.summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+.summary-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+.summary-item {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  padding: 20rpx 0;
+}
+.summary-label {
+  font-size: 26rpx;
+  color: var(--text-muted);
+}
+.summary-num {
+  font-size: 40rpx;
+  font-weight: 700;
+  margin-top: 8rpx;
+  font-variant-numeric: tabular-nums;
+}
+.section {
+  padding: 28rpx;
+}
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 12rpx;
+}
+.cat-row {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--divider);
+}
+.cat-row:last-child {
+  border-bottom: none;
+}
+.cat-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+}
+.cat-name {
+  flex: 1;
+  font-size: 28rpx;
+}
+.cat-pct {
+  color: var(--text-muted);
+  font-size: 26rpx;
+  margin-right: 24rpx;
+}
+.cat-amount {
+  font-weight: 600;
+  font-size: 28rpx;
+}

@@ -1,0 +1,72 @@
+<view class="page">
+  <!-- 类型切换 -->
+  <view class="type-switch">
+    <view
+      wx:for="{{types}}"
+      wx:key="key"
+      class="type-btn {{activeType === item.key ? 'active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onType"
+    >{{item.label}}</view>
+  </view>
+
+  <!-- 金额 -->
+  <view class="card amount-card">
+    <text class="amount-symbol">{{activeType === 'expense' ? '-' : '+'}}</text>
+    <input
+      class="amount-input"
+      type="digit"
+      placeholder="0.00"
+      value="{{amount}}"
+      bindinput="onAmount"
+    />
+    <text class="amount-unit">元</text>
+  </view>
+
+  <!-- 分类网格 -->
+  <view class="card section">
+    <view class="section-title">选择分类</view>
+    <view class="cat-grid">
+      <view
+        wx:for="{{categories}}"
+        wx:key="id"
+        class="cat-cell {{categoryId === item.id ? 'selected' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onCategory"
+      >
+        <view class="cat-icon" style="background: {{item.color}}22">{{item.icon}}</view>
+        <text class="cat-label">{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 明细 -->
+  <view class="card section">
+    <view class="field-row">
+      <text class="field-label">账户</text>
+      <picker range="{{accounts}}" range-key="name" value="{{accountIndex}}" bindchange="onAccount">
+        <view class="field-value">
+          {{accountIndex >= 0 ? accounts[accountIndex].name : '不关联账户'}} ›
+        </view>
+      </picker>
+    </view>
+    <view class="field-row">
+      <text class="field-label">商户/备注</text>
+      <input placeholder="选填" value="{{merchant}}" bindinput="onMerchant" />
+    </view>
+    <view class="field-row">
+      <text class="field-label">备注</text>
+      <input placeholder="选填" value="{{description}}" bindinput="onDesc" />
+    </view>
+    <view class="field-row" wx:if="{{activeType === 'expense'}}">
+      <text class="field-label">私密消费</text>
+      <switch checked="{{isPrivate}}" bindchange="onPrivate" color="#7f77dd" />
+    </view>
+  </view>
+
+  <view class="save-area">
+    <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSave">
+      {{saving ? '保存中…' : '保存'}}
+    </button>
+  </view>
+</view>

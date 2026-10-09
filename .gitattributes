@@ -1,0 +1,36 @@
+# Windows 上 git 默认 core.autocrlf=true，会把脚本转成 CRLF。
+# 服务器上的 bash 遇到 CRLF 会报：
+#   /bin/bash^M: bad interpreter: No such file or directory
+# 所以所有要在 Linux 上执行的文件强制 LF。
+*.sh        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.conf      text eol=lf
+Dockerfile  text eol=lf
+*.py        text eol=lf
+*.example   text eol=lf
+.gitignore  text eol=lf
+
+# PowerShell 脚本保持原样（CRLF 无所谓，且带 UTF-8 BOM）
+*.ps1       text eol=crlf
+
+# 前端源码与构建产物：不声明的话会跟着各台机器的 core.autocrlf 走，
+# 服务器上 checkout 出 CRLF 虽不致命，但会让 dist 内容与本机构建结果对不上。
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.vue  text eol=lf
+*.wxml text eol=lf
+*.wxss text eol=lf
+
+# 二进制别被换行转换破坏
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary

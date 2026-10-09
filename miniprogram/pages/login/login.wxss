@@ -1,0 +1,51 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 48rpx;
+  background: linear-gradient(160deg, #eeedfe 0%, #f1efe8 60%);
+}
+.brand {
+  text-align: center;
+  margin-bottom: 64rpx;
+}
+.brand-icon {
+  font-size: 88rpx;
+}
+.brand-name {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 16rpx;
+}
+.brand-sub {
+  font-size: 26rpx;
+  color: var(--text-muted);
+  margin-top: 12rpx;
+}
+.form {
+  padding: 40rpx 32rpx;
+}
+.field {
+  margin-bottom: 28rpx;
+}
+.label {
+  display: block;
+  font-size: 26rpx;
+  color: var(--text-sub);
+  margin-bottom: 12rpx;
+}
+.field input {
+  border: 1rpx solid var(--border);
+  border-radius: var(--radius-btn);
+  padding: 24rpx;
+  font-size: 30rpx;
+  background: #fafaf8;
+}
+.hint {
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--text-muted);
+  margin-top: 28rpx;
+}

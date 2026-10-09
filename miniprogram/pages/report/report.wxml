@@ -1,0 +1,63 @@
+<view class="page">
+  <scroll-view scroll-x class="preset-bar" enhanced show-scrollbar="{{false}}">
+    <view
+      wx:for="{{presets}}"
+      wx:key="key"
+      class="chip {{activePreset === item.key ? 'active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onPreset"
+    >{{item.label}}</view>
+  </scroll-view>
+
+  <block wx:if="{{ov}}">
+    <view class="card summary-card">
+      <view class="summary-head">
+        <text class="summary-title">收支概览</text>
+        <text class="text-muted">{{ov.range.label}}</text>
+      </view>
+      <view class="summary-grid">
+        <view class="summary-item">
+          <text class="summary-label">收入</text>
+          <text class="summary-num text-income">¥{{ov.income}}</text>
+        </view>
+        <view class="summary-item">
+          <text class="summary-label">支出</text>
+          <text class="summary-num text-expense">¥{{ov.expense}}</text>
+        </view>
+        <view class="summary-item">
+          <text class="summary-label">结余</text>
+          <text class="summary-num">¥{{ov.balance}}</text>
+        </view>
+        <view class="summary-item">
+          <text class="summary-label">储蓄率</text>
+          <text class="summary-num text-primary">{{ov.saving_rate}}%</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="card section">
+      <view class="section-title">支出分类</view>
+      <view class="cat-row" wx:for="{{ov.expense_categories}}" wx:key="id">
+        <view class="cat-dot" style="background: {{item.color}}"></view>
+        <text class="cat-name">{{item.name}}</text>
+        <text class="cat-pct">{{item.percent}}%</text>
+        <text class="cat-amount">¥{{item.amount}}</text>
+      </view>
+      <view wx:if="{{!ov.expense_categories.length}}" class="empty">暂无支出</view>
+    </view>
+
+    <view class="card section">
+      <view class="section-title">收入分类</view>
+      <view class="cat-row" wx:for="{{ov.income_categories}}" wx:key="id">
+        <view class="cat-dot" style="background: {{item.color}}"></view>
+        <text class="cat-name">{{item.name}}</text>
+        <text class="cat-pct">{{item.percent}}%</text>
+        <text class="cat-amount">¥{{item.amount}}</text>
+      </view>
+      <view wx:if="{{!ov.income_categories.length}}" class="empty">暂无收入</view>
+    </view>
+  </block>
+
+  <view wx:elif="{{loading}}" class="empty">加载中…</view>
+  <view wx:else class="empty">暂无数据</view>
+</view>

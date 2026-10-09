@@ -1,0 +1,17 @@
+# 家庭财务通 · 后端依赖（裁剪版 TestHub 架构）
+# 说明：本机全局 Python 3.12 已具备全部依赖，此文件用于全新环境/CI 安装。
+Django==6.0.2
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+django-filter==25.2
+drf-spectacular==0.29.0
+django-cors-headers==4.9.0
+django-q2>=1.6.0
+redis==7.4.0
+PyMySQL>=1.1.2
+python-decouple==3.8
+PyYAML>=6.0
+chardet>=5.0,<7
+Pillow>=11.0
+httpx>=0.28
+gunicorn>=23.0

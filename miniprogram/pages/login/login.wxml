@@ -1,0 +1,33 @@
+<view class="login-page">
+  <view class="brand">
+    <view class="brand-icon">💰</view>
+    <view class="brand-name">家庭财务通</view>
+    <view class="brand-sub">夫妻共同记账 · 平衡透明与隐私</view>
+  </view>
+
+  <view class="form card">
+    <view class="field">
+      <text class="label">手机号</text>
+      <input
+        type="number"
+        maxlength="11"
+        placeholder="请输入手机号"
+        value="{{phone}}"
+        bindinput="onPhone"
+      />
+    </view>
+    <view class="field">
+      <text class="label">密码</text>
+      <input
+        password
+        placeholder="请输入密码"
+        value="{{password}}"
+        bindinput="onPassword"
+      />
+    </view>
+    <button class="btn-primary {{loading ? 'disabled' : ''}}" bindtap="onLogin">
+      {{loading ? '登录中…' : '登 录'}}
+    </button>
+    <view class="hint">演示账号：13800138000 / test123456</view>
+  </view>
+</view>

@@ -1,0 +1,32 @@
+# ---- 机密：绝不入库 ----
+.env
+deploy/.env
+deploy/certs/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 本项目运行时产物 ----
+backend/logs/
+backend/media/
+backend/db.sqlite3
+*.log
+*.log.*
+
+# ---- 前端 ----
+node_modules/
+frontend/.vite/
+# 注意：frontend/dist 是故意不忽略的 —— 服务器从 GitLab 拉代码、不装 Node，
+#       前端产物必须随仓库提交。发版时先 npm run build 再 git add .
+.vite/
+.DS_Store
+
+# ---- 部署打包产物 ----
+family-ledger-deploy.tar.gz
+
+# ---- 工具缓存 ----
+.playwright-cli/

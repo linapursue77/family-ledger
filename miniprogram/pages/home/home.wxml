@@ -1,0 +1,164 @@
+<view class="page">
+  <!-- 时间控件 -->
+  <view class="time-picker-bar" bindtap="toggleOptions">
+    <view class="time-picker-left">
+      <text class="time-picker-icon">📅</text>
+      <text class="time-picker-text">{{activePresetLabel}}</text>
+    </view>
+    <text class="time-picker-arrow">›</text>
+  </view>
+  <view class="time-picker-options {{showOptions ? 'show' : ''}}">
+    <view
+      wx:for="{{presets}}"
+      wx:key="key"
+      class="time-picker-option {{activePreset === item.key ? 'active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onPreset"
+    >{{item.label}}</view>
+    <view class="time-picker-option custom">📆 自定义</view>
+  </view>
+  <view class="time-range-display" wx:if="{{ov}}">
+    <text class="time-range-text">{{ov.range.start}} ~ {{ov.range.end}}</text>
+  </view>
+
+  <block wx:if="{{ov}}">
+    <!-- 资产卡 -->
+    <view class="asset-card">
+      <view class="label">🏦 家庭总资产</view>
+      <view class="amount">¥{{ov.total_assets}}</view>
+      <view class="change">{{assetChange}} › 点击查看净值曲线</view>
+    </view>
+
+    <!-- 收支切换 -->
+    <view class="income-expense-toggle">
+      <view class="toggle-btn {{activeTab === 'expense' ? 'active' : ''}}" data-tab="expense" bindtap="onTab">💸 支出</view>
+      <view class="toggle-btn {{activeTab === 'income' ? 'active' : ''}}" data-tab="income" bindtap="onTab">💰 收入</view>
+    </view>
+
+    <!-- 支出内容 -->
+    <block wx:if="{{activeTab === 'expense'}}">
+      <view class="card summary-card">
+        <view class="summary-main">
+          <text class="summary-label">本月支出</text>
+          <text class="summary-value text-expense">¥{{ov.expense}}</text>
+        </view>
+        <text class="summary-sub text-muted">比上月 {{ov.saving_rate}}%</text>
+      </view>
+
+      <view class="card">
+        <view class="section-title">支出分类</view>
+        <view class="pie-row">
+          <view class="pie" style="{{pieStyle}}"></view>
+          <view class="mini-legend">
+            <view class="legend-row" wx:for="{{ov.expense_categories}}" wx:key="category_id">
+              <text class="legend-name">{{item.name}}</text>
+              <text class="legend-pct">{{item.percent}}%</text>
+            </view>
+          </view>
+        </view>
+        <view class="category-list">
+          <view
+            class="category-item"
+            wx:for="{{ov.expense_categories}}"
+            wx:key="category_id"
+            data-cat="{{item}}"
+            bindtap="openCategory"
+          >
+            <view class="category-icon" style="background: {{item.color}}22">{{item.icon}}</view>
+            <view class="category-info">
+              <view class="category-name">{{item.name}} <text class="category-percent">{{item.percent}}%</text></view>
+              <view class="progress-bar">
+                <view class="progress-fill" style="width: {{item.percent}}%; background: {{item.color}}"></view>
+              </view>
+            </view>
+            <text class="category-amount">¥{{item.amount}}</text>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 收入内容 -->
+    <block wx:if="{{activeTab === 'income'}}">
+      <view class="card summary-card">
+        <view class="summary-main">
+          <text class="summary-label">本月收入</text>
+          <text class="summary-value text-income">¥{{ov.income}}</text>
+        </view>
+        <text class="summary-sub text-muted">储蓄率 {{ov.saving_rate}}%</text>
+      </view>
+
+      <view class="card">
+        <view class="section-title">收入构成</view>
+        <view class="pie-row">
+          <view class="pie" style="{{pieStyle}}"></view>
+          <view class="mini-legend">
+            <view class="legend-row" wx:for="{{ov.income_categories}}" wx:key="category_id">
+              <text class="legend-name">{{item.name}}</text>
+              <text class="legend-pct">{{item.percent}}%</text>
+            </view>
+          </view>
+        </view>
+        <view class="category-list">
+          <view
+            class="category-item"
+            wx:for="{{ov.income_categories}}"
+            wx:key="category_id"
+            data-cat="{{item}}"
+            bindtap="openCategory"
+          >
+            <view class="category-icon" style="background: {{item.color}}22">{{item.icon}}</view>
+            <view class="category-info">
+              <view class="category-name">{{item.name}} <text class="category-percent">{{item.percent}}%</text></view>
+              <view class="progress-bar">
+                <view class="progress-fill" style="width: {{item.percent}}%; background: {{item.color}}"></view>
+              </view>
+            </view>
+            <text class="category-amount">¥{{item.amount}}</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </block>
+
+  <view wx:elif="{{loading}}" class="empty">加载中…</view>
+  <view wx:else class="empty">暂无数据</view>
+
+  <!-- 浮动记账按钮 -->
+  <view class="floating-btn" bindtap="goAdd">+</view>
+
+  <!-- 账户弹窗 -->
+  <view wx:if="{{showAccounts}}" class="sheet-mask" bindtap="closeAccounts">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">账户管理</text>
+        <text class="sheet-close" bindtap="closeAccounts">×</text>
+      </view>
+      <view class="list-item" wx:for="{{accounts}}" wx:key="id">
+        <text class="acc-icon">{{item.icon}}</text>
+        <view class="acc-info">
+          <text class="acc-name">{{item.name}}</text>
+          <text class="acc-book text-muted">{{item.book_type}}</text>
+        </view>
+        <text class="acc-balance">¥{{item.balance}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 分类明细弹窗 -->
+  <view wx:if="{{showCategory}}" class="sheet-mask" bindtap="closeCategory">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">{{activeCategory.name}}明细</text>
+        <text class="sheet-close" bindtap="closeCategory">×</text>
+      </view>
+      <view class="list-item" wx:for="{{categoryTxs}}" wx:key="id">
+        <view class="tx-info">
+          <text class="tx-merchant">{{item.merchant}}</text>
+          <text class="tx-date text-muted">{{item.dateText}}</text>
+        </view>
+        <text class="tx-amount {{item.type === 'income' ? 'text-income' : 'text-expense'}}">{{item.amountText}}</text>
+      </view>
+      <view wx:if="{{!categoryTxs.length}}" class="empty">暂无记录</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,100 @@
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 36rpx 32rpx;
+}
+.avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+.user-name {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.user-family {
+  font-size: 26rpx;
+  margin-top: 6rpx;
+}
+.section {
+  padding: 28rpx;
+}
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.add-btn {
+  color: var(--primary);
+  font-size: 28rpx;
+}
+.acc-icon {
+  font-size: 40rpx;
+}
+.acc-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.acc-name {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.acc-book {
+  font-size: 24rpx;
+}
+.acc-balance {
+  font-weight: 700;
+  font-size: 30rpx;
+}
+.logout-area {
+  padding: 40rpx 24rpx;
+}
+.btn-logout {
+  background: #fff;
+  color: var(--expense);
+  border: 1rpx solid var(--border);
+  border-radius: var(--radius-btn);
+  font-size: 30rpx;
+  padding: 22rpx 0;
+  text-align: center;
+}
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--divider);
+}
+.field-label {
+  font-size: 28rpx;
+  color: var(--text-sub);
+}
+.field-value {
+  font-size: 28rpx;
+}
+.field-row input {
+  font-size: 28rpx;
+  text-align: right;
+  flex: 1;
+  margin-left: 24rpx;
+}

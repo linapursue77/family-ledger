@@ -1,0 +1,73 @@
+<view class="page">
+  <!-- 平台选择 -->
+  <view class="card section">
+    <view class="section-title">账单平台</view>
+    <view class="platform-row">
+      <view
+        wx:for="{{platforms}}"
+        wx:key="key"
+        class="chip {{platform === item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onPlatform"
+      >{{item.label}}</view>
+    </view>
+  </view>
+
+  <!-- 文件选择 -->
+  <view class="card section">
+    <view class="file-picker" bindtap="onChooseFile">
+      <view class="file-icon">📄</view>
+      <view class="file-info">
+        <text class="file-name">{{fileName || '点击选择微信/支付宝账单 CSV'}}</text>
+        <text class="file-hint text-muted">支持 UTF-8 / GBK 编码，自动识别平台</text>
+      </view>
+    </view>
+    <button class="btn-primary {{uploading ? 'disabled' : ''}}" bindtap="onUpload">
+      {{uploading ? '解析中…' : '解析账单'}}
+    </button>
+  </view>
+
+  <block wx:if="{{stats}}">
+    <!-- 统计 -->
+    <view class="card section">
+      <view class="section-title">解析结果</view>
+      <view class="stat-row">
+        <view class="stat"><text class="stat-num">{{stats.total}}</text><text class="stat-label">总记录</text></view>
+        <view class="stat"><text class="stat-num text-income">{{stats.new}}</text><text class="stat-label">新增</text></view>
+        <view class="stat"><text class="stat-num text-muted">{{stats.duplicate + stats.internal_duplicate}}</text><text class="stat-label">重复</text></view>
+        <view class="stat"><text class="stat-num" style="color:#f5a623">{{stats.uncategorized}}</text><text class="stat-label">待确认</text></view>
+      </view>
+    </view>
+
+    <!-- 预览列表 -->
+    <view class="card section">
+      <view class="section-title">预览（前 {{rows.length}} 条）</view>
+      <view class="list-item" wx:for="{{rows}}" wx:key="i">
+        <view class="tx-info">
+          <text class="tx-merchant">{{item.merchant}}</text>
+          <text class="tx-date text-muted">{{item.date}} · {{item.category}}</text>
+        </view>
+        <view class="tx-right">
+          <text class="tx-amount {{item.type === 'income' ? 'text-income' : 'text-expense'}}">
+            {{item.type === 'income' ? '+' : '-'}}{{item.amountText}}
+          </text>
+          <text class="tx-status {{item.status === 'new' ? 's-new' : 's-dup'}}">{{item.statusText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 账户 + 确认 -->
+    <view class="card section" wx:if="{{!confirmed}}">
+      <view class="field-row">
+        <text class="field-label">导入到账户</text>
+        <picker range="{{accounts}}" range-key="name" value="{{accountIndex}}" bindchange="onAccount">
+          <view class="field-value">
+            {{accounts.length ? accounts[accountIndex].name : '不关联账户'}} ›
+          </view>
+        </picker>
+      </view>
+      <button class="btn-primary" bindtap="onConfirm">确认导入</button>
+    </view>
+    <view wx:if="{{confirmed}}" class="empty">✅ 已导入完成</view>
+  </block>
+</view>

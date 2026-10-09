@@ -1,0 +1,150 @@
+/* 设计 Token（对齐 PRD 原型） */
+page {
+  --primary: #7f77dd;
+  --primary-dark: #534ab7;
+  --primary-light: #eeedfe;
+  --income: #1d9e75;
+  --expense: #e24b4a;
+  --text-main: #26215c;
+  --text-body: #2c2c2a;
+  --text-sub: #5f5e5a;
+  --text-muted: #888780;
+  --bg: #f1efe8;
+  --card: #ffffff;
+  --divider: #f1efe8;
+  --border: #e8e8e8;
+  --radius-card: 24rpx;
+  --radius-large: 32rpx;
+  --radius-btn: 16rpx;
+  --radius-full: 72rpx;
+  --shadow-card: 0 4rpx 24rpx rgba(38, 33, 92, 0.06);
+
+  background: var(--bg);
+  color: var(--text-body);
+  font-size: 28rpx;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  border: 1rpx solid var(--border);
+  padding: 28rpx;
+  margin: 0 24rpx 20rpx;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-radius: var(--radius-btn);
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+  padding: 22rpx 0;
+  border: none;
+  line-height: 1.4;
+}
+.btn-primary.disabled {
+  opacity: 0.5;
+}
+
+.chip {
+  padding: 10rpx 26rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  background: #fff;
+  color: var(--text-sub);
+  border: 1rpx solid var(--border);
+  margin-right: 16rpx;
+  display: inline-block;
+}
+.chip.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.text-income { color: var(--income); }
+.text-expense { color: var(--expense); }
+.text-primary { color: var(--primary); }
+.text-muted { color: var(--text-muted); }
+
+.amount-hero {
+  font-size: 60rpx;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  padding: 20rpx 32rpx 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.navbar-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--divider);
+}
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(38, 33, 92, 0.4);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+.sheet {
+  width: 100%;
+  background: #fff;
+  border-radius: var(--radius-full) var(--radius-full) 0 0;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  max-height: 88vh;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(40rpx); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.sheet-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.sheet-close {
+  font-size: 40rpx;
+  color: var(--text-muted);
+  padding: 0 8rpx;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 80rpx 0;
+  font-size: 26rpx;
+}

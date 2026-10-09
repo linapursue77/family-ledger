@@ -1,0 +1,105 @@
+.section {
+  padding: 28rpx;
+}
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 20rpx;
+}
+.platform-row {
+  display: flex;
+}
+.file-picker {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 32rpx;
+  border: 2rpx dashed var(--border);
+  border-radius: var(--radius-btn);
+  margin-bottom: 24rpx;
+  background: #fafaf8;
+}
+.file-icon {
+  font-size: 48rpx;
+}
+.file-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.file-name {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.file-hint {
+  font-size: 24rpx;
+  margin-top: 8rpx;
+}
+.stat-row {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+.stat-num {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.stat-label {
+  font-size: 24rpx;
+  color: var(--text-muted);
+  margin-top: 8rpx;
+}
+.tx-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.tx-merchant {
+  font-size: 28rpx;
+}
+.tx-date {
+  font-size: 22rpx;
+  margin-top: 4rpx;
+}
+.tx-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.tx-amount {
+  font-weight: 700;
+  font-size: 28rpx;
+}
+.tx-status {
+  font-size: 22rpx;
+  margin-top: 6rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+.s-new {
+  color: var(--income);
+  background: rgba(29, 158, 117, 0.12);
+}
+.s-dup {
+  color: var(--text-muted);
+  background: rgba(136, 135, 128, 0.12);
+}
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0 28rpx;
+}
+.field-label {
+  font-size: 28rpx;
+  color: var(--text-sub);
+}
+.field-value {
+  font-size: 28rpx;
+}

@@ -1,0 +1,106 @@
+# 家庭财务通 · 单机全家桶（MySQL + Redis + Django + django-q + nginx）
+#
+# 用法（本文件所在目录执行）：
+#   cp env.production.example .env      # 填好密码与域名
+#   cd .. && npm --prefix frontend run build   # 生成 frontend/dist
+#   cd deploy && docker compose up -d --build
+#
+# 只有 1~5 人的家庭规模，2 workers 足够；所有数据都在命名卷里。
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    # utf8mb4 才能存 emoji 备注；+08:00 保证「本月/上月」按北京时间切分
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci --default-time-zone=+08:00
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-p${DB_ROOT_PASSWORD}']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        # 后端 Python 依赖的安装源，写在 deploy/.env 里就能覆盖，无需改本文件
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      REDIS_HOST: redis
+    volumes:
+      - media_data:/app/backend/media
+      - logs:/app/backend/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - '8000'
+
+  # 异步任务：账单解析、月度快照等。没有它，导入账单会一直停在「解析中」
+  queue:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    restart: unless-stopped
+    command: python manage.py qcluster
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      REDIS_HOST: redis
+    volumes:
+      - media_data:/app/backend/media
+      - logs:/app/backend/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # 前端构建产物，改版时重新 build 即可，无需重建镜像
+      - ../frontend/dist:/usr/share/nginx/html:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+
+volumes:
+  db_data:
+  redis_data:
+  media_data:
+  logs:
