@@ -137,7 +137,8 @@ class ProfileUpdateView(APIView):
     class _InlineSerializer(serializers.Serializer):
         nickname = serializers.CharField(max_length=50, required=False)
         avatar_url = serializers.CharField(max_length=255, required=False, allow_blank=True)
-        privacy_limit_cents = serializers.IntegerField(min_value=10000, max_value=200000,
+        # ¥100 ~ ¥5000：不收费阶段上限按最高档放开
+        privacy_limit_cents = serializers.IntegerField(min_value=10000, max_value=500000,
                                                        required=False)
 
     def patch(self, request):

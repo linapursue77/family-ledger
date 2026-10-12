@@ -18,8 +18,8 @@ class User(AbstractUser):
     avatar_url = models.CharField('头像', max_length=255, blank=True, default='')
     phone = models.CharField('手机号', max_length=20, unique=True, null=True, blank=True)
     openid = models.CharField('微信OpenID', max_length=128, unique=True, null=True, blank=True)
-    # 隐私空间月度额度（分），默认 ¥500
-    privacy_limit_cents = models.BigIntegerField('隐私额度(分)', default=50000)
+    # 隐私空间月度额度（分），默认 ¥5000（不收费阶段按最高档放开，用户仍可自行调低）
+    privacy_limit_cents = models.BigIntegerField('隐私额度(分)', default=500000)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 
     class Meta:

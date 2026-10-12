@@ -40,17 +40,29 @@ def is_vip(user) -> bool:
 
 
 def has_benefit(user, key: str) -> bool:
-    """权益判权：非 VIP 专属权益人人可用，VIP 专属的看会员状态。"""
+    """权益判权：非 VIP 专属权益人人可用，VIP 专属的看会员状态。
+
+    settings.VIP_GATED=False 时（当前）付费权益一律放行——先用起来攒粘性，
+    要收费时把开关打开即可，调用方不用改。
+    """
     if key not in VIP_ONLY:
+        return True
+    if not settings.VIP_GATED:
         return True
     return is_vip(user)
 
 
 def member_limit(user) -> int:
+    """家庭成员上限：关闸时按 VIP 档放行。"""
+    if not settings.VIP_GATED:
+        return VIP_MEMBER_LIMIT
     return VIP_MEMBER_LIMIT if is_vip(user) else FREE_MEMBER_LIMIT
 
 
 def privacy_limit_cents(user) -> int:
+    """隐私月度额度：关闸时按 VIP 档放行。"""
+    if not settings.VIP_GATED:
+        return VIP_PRIVACY_LIMIT_CENTS
     return VIP_PRIVACY_LIMIT_CENTS if is_vip(user) else FREE_PRIVACY_LIMIT_CENTS
 
 

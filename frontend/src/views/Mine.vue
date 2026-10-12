@@ -11,6 +11,7 @@ import {
   membershipApi,
 } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { VIP_ENABLED } from '@/utils/flags'
 import { yuan } from '@/utils/money'
 
 const router = useRouter()
@@ -225,17 +226,19 @@ async function load() {
   } catch (e) {
     retSum.value = null
   }
-  try {
-    vipInfo.value = await membershipApi.mine()
-  } catch (e) {
-    vipInfo.value = null
+  if (VIP_ENABLED) {
+    try {
+      vipInfo.value = await membershipApi.mine()
+    } catch (e) {
+      vipInfo.value = null
+    }
   }
 }
 
 // —— 隐私额度：每人一份，私密支出超过额度部分自动计入共同支出 ——
-const PRIVACY_MIN = 100 // 与后端 ProfileUpdateView 的 10000~200000 分对齐
-const PRIVACY_MAX = 2000
-const PRIVACY_PRESETS = [300, 500, 1000, 2000]
+const PRIVACY_MIN = 100 // 与后端 ProfileUpdateView 的 10000~500000 分对齐
+const PRIVACY_MAX = 5000
+const PRIVACY_PRESETS = [300, 500, 1000, 2000, 5000]
 const showPrivacyForm = ref(false)
 const privacySaving = ref(false)
 const privacyMsg = ref('')
@@ -247,7 +250,7 @@ const privacyText = computed(() => {
 })
 
 function openPrivacy() {
-  privacyYuan.value = Math.round(Number(auth.user?.privacy_limit_cents || 50000) / 100)
+  privacyYuan.value = Math.round(Number(auth.user?.privacy_limit_cents || 500000) / 100)
   privacyMsg.value = ''
   showPrivacyForm.value = !showPrivacyForm.value
 }
@@ -360,7 +363,7 @@ onMounted(() => {
         <span class="menu-text">账户管理</span>
         <span class="menu-arrow">›</span>
       </div>
-      <div class="menu-item" @click="router.push('/member')">
+      <div v-if="VIP_ENABLED" class="menu-item" @click="router.push('/member')">
         <span class="menu-icon">👑</span>
         <span class="menu-text">会员中心</span>
         <span class="menu-value" :class="{ 'vip-on': vipInfo?.is_vip }">{{ vipText }}</span>

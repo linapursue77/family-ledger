@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { VIP_ENABLED } from '@/utils/flags'
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('@/views/Login.vue'), meta: { tab: false } },
@@ -31,6 +32,10 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  // 会员入口未开放：直接输 /#/member 也进不去，回到「我的」
+  if (!VIP_ENABLED && to.name === 'member') {
+    return { name: 'mine' }
+  }
   const token = localStorage.getItem('fl_token')
   if (to.name !== 'login' && !token) {
     return { name: 'login' }
