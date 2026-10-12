@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 家庭财务通 · 服务器一键发版（代码走 GitLab，服务器上不装 Node）
+# 钱来钱往记账 · 服务器一键发版（代码走 GitLab，服务器上不装 Node）
 #
 # 用法：
 #   bash deploy/update.sh

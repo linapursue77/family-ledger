@@ -1,4 +1,4 @@
-# 家庭财务通 · 后端依赖（裁剪版 TestHub 架构）
+# 钱来钱往记账 · 后端依赖（裁剪版 TestHub 架构）
 # 说明：本机全局 Python 3.12 已具备全部依赖，此文件用于全新环境/CI 安装。
 Django==6.0.2
 djangorestframework==3.16.1

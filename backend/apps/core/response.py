@@ -57,6 +57,28 @@ def api_response(data=None, message: str = 'ok', code: int = CODE_OK,
     )
 
 
+def _first_field_error(detail: dict) -> str:
+    """从 DRF 的字段级校验错误里挑第一条文案。
+
+    {'old_password': ['当前密码不正确']} → '当前密码不正确'
+    {'amount': ['必须大于 0'], 'date': ['格式不对']} → '必须大于 0'
+    """
+    if not isinstance(detail, dict):
+        return ''
+    for _field, errors in detail.items():
+        if _field in ('detail', 'message'):
+            continue
+        if isinstance(errors, list) and errors:
+            return str(errors[0])
+        if isinstance(errors, str):
+            return errors
+        # 嵌套 serializer：{'profile': {'nickname': ['不能为空']}}
+        nested = _first_field_error(errors) if isinstance(errors, dict) else ''
+        if nested:
+            return nested
+    return ''
+
+
 def api_exception_handler(exc, context):
     """DRF EXCEPTION_HANDLER：把各类异常收敛成统一信封。"""
     response = drf_exception_handler(exc, context)
@@ -93,7 +115,10 @@ def api_exception_handler(exc, context):
     detail = response.data
     message = '请求失败'
     if isinstance(detail, dict):
-        message = detail.get('detail') or detail.get('message') or message
+        # 优先整体文案；否则是 DRF 的字段级校验错误 {"字段名": ["错误文案"]}，
+        # 取第一条给用户看，比落到「请求失败」这种兜底文案有用得多
+        message = (detail.get('detail') or detail.get('message')
+                   or _first_field_error(detail) or message)
     elif isinstance(detail, list) and detail:
         message = str(detail[0])
 

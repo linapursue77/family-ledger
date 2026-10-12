@@ -25,6 +25,32 @@
     <view wx:if="{{!accounts.length}}" class="empty">暂无账户，点击右上角新增</view>
   </view>
 
+  <!-- 登录密码：微信一键登录的账号默认没有密码，设置后可在网页版登录 -->
+  <view class="card section">
+    <view class="section-head" bindtap="openPwd">
+      <text class="section-title">🔑 {{pwdTitle}}</text>
+      <text class="add-btn">{{pwdText}}</text>
+    </view>
+    <view wx:if="{{showPwd}}" class="pwd-form">
+      <view wx:if="{{hasPassword}}" class="field-row">
+        <text class="field-label">当前密码</text>
+        <input password placeholder="请输入当前密码" value="{{pwdOld}}" bindinput="onPwdOld" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">新密码</text>
+        <input password placeholder="字母+数字，至少 6 位" value="{{pwdNew}}" bindinput="onPwdNew" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">确认密码</text>
+        <input password placeholder="再输入一次新密码" value="{{pwdConfirm}}" bindinput="onPwdConfirm" />
+      </view>
+      <button class="btn-primary {{pwdSaving ? 'disabled' : ''}}" bindtap="onSavePwd">
+        {{pwdSaving ? '保存中…' : '保存'}}
+      </button>
+      <view class="pwd-note">用微信登录的账号默认没有密码，设置后即可用「手机号 + 密码」在网页版登录。</view>
+    </view>
+  </view>
+
   <view class="logout-area">
     <button class="btn-logout" bindtap="onLogout">退出登录</button>
   </view>

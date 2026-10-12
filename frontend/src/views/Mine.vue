@@ -318,6 +318,60 @@ const PUSH_ITEMS = [
   { label: '每月账单汇总', state: '未接入' },
 ]
 
+// —— 登录密码：微信一键登录的用户没有密码，在这里补一个后即可用手机号登录 H5 ——
+const showPwdForm = ref(false)
+const pwdSaving = ref(false)
+const pwdMsg = ref('')
+const pwdForm = reactive({ old_password: '', new_password: '', confirm_password: '' })
+const hasPassword = computed(() => auth.user?.has_password !== false)
+
+const pwdTitle = computed(() => (hasPassword.value ? '修改密码' : '设置密码'))
+const pwdText = computed(() => (hasPassword.value ? '已设置' : '未设置'))
+
+function openPwd() {
+  pwdForm.old_password = ''
+  pwdForm.new_password = ''
+  pwdForm.confirm_password = ''
+  pwdMsg.value = ''
+  showPwdForm.value = !showPwdForm.value
+}
+
+async function savePwd() {
+  if (hasPassword.value && !pwdForm.old_password) {
+    pwdMsg.value = '请先填写当前密码'
+    return
+  }
+  // 密码规则：字母+数字，不低于 6 位（与后端 validators.LetterAndDigitValidator 一致）
+  if (!/^(?=.*[a-zA-Z])(?=.*\d).{6,}$/.test(pwdForm.new_password)) {
+    pwdMsg.value = '密码需同时包含字母和数字，且不低于 6 位'
+    return
+  }
+  if (pwdForm.confirm_password !== pwdForm.new_password) {
+    pwdMsg.value = '两次输入的新密码不一致'
+    return
+  }
+  pwdSaving.value = true
+  pwdMsg.value = ''
+  try {
+    await authApi.updatePassword({
+      old_password: pwdForm.old_password,
+      new_password: pwdForm.new_password,
+      confirm_password: pwdForm.confirm_password,
+    })
+    auth.user = { ...auth.user, has_password: true }
+    pwdMsg.value = hasPassword.value
+      ? '密码已修改，下次登录请使用新密码'
+      : `已设置，之后可用手机号 ${auth.user?.phone || ''} 登录网页版`
+    pwdForm.old_password = ''
+    pwdForm.new_password = ''
+    pwdForm.confirm_password = ''
+  } catch (e) {
+    pwdMsg.value = e?.message || '保存失败'
+  } finally {
+    pwdSaving.value = false
+  }
+}
+
 function onLogout() {
   auth.logout()
   router.push('/login')
@@ -578,6 +632,36 @@ onMounted(() => {
         <div class="ai-note">
           系统推送需要微信服务号模板消息或浏览器 Push 授权，当前版本还没有接通道，所以这里没有开关可以拨。
           现在能拿到的提醒是记账后的即时提示：超过「事后知会」提示你知会对方，超过「事前申请」提示需对方确认。
+        </div>
+      </div>
+      <div class="menu-item" @click="openPwd">
+        <span class="menu-icon">🔑</span>
+        <span class="menu-text">{{ pwdTitle }}</span>
+        <span class="menu-value">{{ pwdText }}</span>
+        <span class="menu-arrow">{{ showPwdForm ? '⌃' : '›' }}</span>
+      </div>
+      <div v-if="showPwdForm" class="ai-form">
+        <div v-if="hasPassword" class="ai-field">
+          <label>当前密码</label>
+          <input v-model="pwdForm.old_password" type="password" placeholder="请输入当前密码" />
+        </div>
+        <div class="ai-field">
+          <label>新密码</label>
+          <input v-model="pwdForm.new_password" type="password" placeholder="字母+数字，至少 6 位" />
+        </div>
+        <div class="ai-field">
+          <label>确认新密码</label>
+          <input v-model="pwdForm.confirm_password" type="password" placeholder="再输入一次新密码" />
+        </div>
+        <div v-if="pwdMsg" class="ai-msg">{{ pwdMsg }}</div>
+        <div class="ai-actions">
+          <button class="ai-btn primary" :disabled="pwdSaving" @click="savePwd">
+            {{ pwdSaving ? '保存中…' : '保存' }}
+          </button>
+        </div>
+        <div class="ai-note">
+          用微信一键登录的账号默认没有密码，设置后即可用「手机号 + 密码」在网页版登录。
+          忘记密码的话，只能在服务器执行命令行重置。
         </div>
       </div>
       <div class="menu-item" @click="onLogout">

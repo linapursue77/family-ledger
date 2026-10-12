@@ -9,7 +9,7 @@
   ],
   "window": {
     "navigationBarBackgroundColor": "#f1efe8",
-    "navigationBarTitleText": "家庭财务通",
+    "navigationBarTitleText": "钱来钱往记账",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f1efe8",
     "backgroundTextStyle": "dark"
@@ -20,11 +20,36 @@
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "list": [
-      { "pagePath": "pages/home/home", "text": "首页" },
-      { "pagePath": "pages/add/add", "text": "记账" },
-      { "pagePath": "pages/import/import", "text": "导入" },
-      { "pagePath": "pages/report/report", "text": "报告" },
-      { "pagePath": "pages/mine/mine", "text": "我的" }
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页",
+        "iconPath": "assets/tabbar/home-normal.png",
+        "selectedIconPath": "assets/tabbar/home-active.png"
+      },
+      {
+        "pagePath": "pages/add/add",
+        "text": "记账",
+        "iconPath": "assets/tabbar/add-normal.png",
+        "selectedIconPath": "assets/tabbar/add-active.png"
+      },
+      {
+        "pagePath": "pages/import/import",
+        "text": "导入",
+        "iconPath": "assets/tabbar/import-normal.png",
+        "selectedIconPath": "assets/tabbar/import-active.png"
+      },
+      {
+        "pagePath": "pages/report/report",
+        "text": "报告",
+        "iconPath": "assets/tabbar/report-normal.png",
+        "selectedIconPath": "assets/tabbar/report-active.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "assets/tabbar/mine-normal.png",
+        "selectedIconPath": "assets/tabbar/mine-active.png"
+      }
     ]
   },
   "style": "v2",

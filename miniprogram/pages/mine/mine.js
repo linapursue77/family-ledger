@@ -26,6 +26,15 @@ Page({
     newBookIndex: 0,
     newBalance: '',
     saving: false,
+    // 登录密码
+    showPwd: false,
+    pwdOld: '',
+    pwdNew: '',
+    pwdConfirm: '',
+    pwdSaving: false,
+    hasPassword: false,
+    pwdTitle: '设置密码',
+    pwdText: '未设置',
   },
 
   onShow() {
@@ -35,9 +44,13 @@ Page({
   async load() {
     try {
       const [me, accounts] = await Promise.all([api.me(), api.accounts()])
+      const hasPwd = !!me.user.has_password
       this.setData({
         user: me.user,
         family: me.family,
+        hasPassword: hasPwd,
+        pwdTitle: hasPwd ? '修改密码' : '设置密码',
+        pwdText: hasPwd ? '已设置' : '未设置',
         accounts: (accounts.items || accounts || []).map((a) => ({
           ...a,
           balanceText: yuan(a.balance_cents).toFixed(2),
@@ -89,6 +102,67 @@ Page({
       wx.showToast({ title: e.message, icon: 'none' })
     } finally {
       this.setData({ saving: false })
+    }
+  },
+
+  // —— 登录密码 ——
+  openPwd() {
+    this.setData({
+      showPwd: !this.data.showPwd,
+      pwdOld: '',
+      pwdNew: '',
+      pwdConfirm: '',
+    })
+  },
+  onPwdOld(e) {
+    this.setData({ pwdOld: e.detail.value })
+  },
+  onPwdNew(e) {
+    this.setData({ pwdNew: e.detail.value })
+  },
+  onPwdConfirm(e) {
+    this.setData({ pwdConfirm: e.detail.value })
+  },
+
+  async onSavePwd() {
+    const { hasPassword, pwdOld, pwdNew, pwdConfirm } = this.data
+    if (hasPassword && !pwdOld) {
+      wx.showToast({ title: '请先填写当前密码', icon: 'none' })
+      return
+    }
+    // 密码规则：字母+数字，不低于 6 位（与后端 validators.LetterAndDigitValidator 一致）
+    if (!/^(?=.*[a-zA-Z])(?=.*\d).{6,}$/.test(pwdNew)) {
+      wx.showToast({ title: '密码需字母+数字，至少 6 位', icon: 'none' })
+      return
+    }
+    if (pwdNew !== pwdConfirm) {
+      wx.showToast({ title: '两次输入的新密码不一致', icon: 'none' })
+      return
+    }
+    this.setData({ pwdSaving: true })
+    try {
+      await api.updatePassword({
+        old_password: pwdOld,
+        new_password: pwdNew,
+        confirm_password: pwdConfirm,
+      })
+      wx.showToast({
+        title: hasPassword ? '密码已修改' : `已设置，可用手机号登录网页版`,
+        icon: 'success',
+      })
+      this.setData({
+        showPwd: false,
+        pwdOld: '',
+        pwdNew: '',
+        pwdConfirm: '',
+        hasPassword: true,
+        pwdTitle: '修改密码',
+        pwdText: '已设置',
+      })
+    } catch (e) {
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' })
+    } finally {
+      this.setData({ pwdSaving: false })
     }
   },
 

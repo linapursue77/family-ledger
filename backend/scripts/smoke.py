@@ -46,7 +46,7 @@ def show(title, status, body):
 
 def main():
     print('=' * 70)
-    print('家庭财务通 · MVP 主链路冒烟')
+    print('钱来钱往记账 · MVP 主链路冒烟')
     print('=' * 70)
 
     # 0. 健康检查

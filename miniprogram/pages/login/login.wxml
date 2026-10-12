@@ -1,11 +1,36 @@
 <view class="login-page">
   <view class="brand">
     <view class="brand-icon">💰</view>
-    <view class="brand-name">家庭财务通</view>
+    <view class="brand-name">钱来钱往记账</view>
     <view class="brand-sub">一起记账 · 平衡透明与隐私</view>
   </view>
 
-  <view class="form card">
+  <!-- 主入口：微信一键登录（所有主体可用，用户无感） -->
+  <button
+    class="wx-btn {{loading ? 'is-loading' : ''}}"
+    disabled="{{loading}}"
+    bindtap="onWxLogin"
+  >
+    <text wx:if="{{!loading}}">微信一键登录</text>
+    <text wx:else>登录中…</text>
+  </button>
+
+  <!-- 增强：手机号快捷验证。需非个人主体 + 已认证，个人主体会自动降级 -->
+  <button
+    class="wx-btn ghost"
+    open-type="getPhoneNumber"
+    bindgetphonenumber="onGetPhone"
+    disabled="{{loading}}"
+  >
+    微信手机号登录
+  </button>
+
+  <view class="divider" bindtap="togglePwd">
+    <text>{{showPwd ? '收起密码登录' : '用手机号密码登录'}}</text>
+  </view>
+
+  <!-- 兜底入口：老用户/无微信环境 -->
+  <view class="form card" wx:if="{{showPwd}}">
     <view class="field">
       <text class="label">手机号</text>
       <input

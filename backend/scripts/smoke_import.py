@@ -80,7 +80,7 @@ def upload(token, filename, content: bytes, platform):
 
 def main():
     print('=' * 70)
-    print('家庭财务通 · 账单导入冒烟')
+    print('钱来钱往记账 · 账单导入冒烟')
     print('=' * 70)
 
     _, body = call('POST', '/auth/login/', json={'phone': PHONE, 'password': PASSWORD})

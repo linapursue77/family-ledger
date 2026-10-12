@@ -154,7 +154,7 @@ def create_vip_order(user, plan: VipPlan, scene: str = VipOrder.SCENE_H5,
         scene=scene,
         amount=int(plan.price_cents),
         openid=openid,
-        description=f'家庭财务通-{plan.name}'[:127],
+        description=f'钱来钱往记账-{plan.name}'[:127],
         expired_at=timezone.now() + timedelta(seconds=settings.WXPAY_ORDER_TTL),
     )
     try:

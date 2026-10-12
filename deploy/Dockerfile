@@ -1,4 +1,4 @@
-# 家庭财务通 · 后端镜像
+# 钱来钱往记账 · 后端镜像
 #
 # 构建语境（context）必须是仓库根目录：
 #   docker build -f deploy/Dockerfile -t family-ledger-web .

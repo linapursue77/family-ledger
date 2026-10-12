@@ -169,7 +169,7 @@ def _order_body(out_trade_no: str, description: str, amount_cents: int,
     # H5 支付允许带 redirect_url，支付完成后跳回前端继续轮询订单
     if trade_type == TRADE_H5 and settings.WXPAY_H5_REDIRECT_URL:
         body['scene_info']['h5_info']['wap_url'] = settings.WXPAY_H5_REDIRECT_URL
-        body['scene_info']['h5_info']['wap_name'] = '家庭财务通'
+        body['scene_info']['h5_info']['wap_name'] = '钱来钱往记账'
     return body
 
 
@@ -345,6 +345,93 @@ def oauth_openid(code: str) -> str:
         'code': code, 'grant_type': 'authorization_code',
     })
     return data.get('openid') or ''
+
+
+# ------------------------------------------------------- 小程序登录 / 手机号快捷验证
+# access_token 是「全局唯一」的：任意一方重新获取，都会让旧的在 5 分钟内失效。
+# 多 worker 各刷各的会互相踢，所以统一放 Django 缓存（生产是 Redis），并加短锁防惊群。
+ACCESS_TOKEN_CACHE_KEY = 'wx:mini:access_token'
+ACCESS_TOKEN_LOCK_KEY = 'wx:mini:access_token:lock'
+
+
+def wechat_access_token(force_refresh: bool = False) -> str:
+    """取小程序全局 access_token，缓存 7000s（官方 7200s）。"""
+    from django.core.cache import cache
+
+    if not force_refresh:
+        token = cache.get(ACCESS_TOKEN_CACHE_KEY)
+        if token:
+            return token
+
+    # 拿锁的进程去刷新，其它进程短暂等待后读缓存；拿不到锁就直接刷（宁可互踢也不要卡死）
+    got_lock = bool(cache.add(ACCESS_TOKEN_LOCK_KEY, 1, timeout=10))
+    if not got_lock:
+        for _ in range(10):
+            time.sleep(0.3)
+            token = cache.get(ACCESS_TOKEN_CACHE_KEY)
+            if token:
+                return token
+
+    appid = settings.WXPAY_MINI_APPID or settings.WXPAY_APPID
+    secret = settings.WXPAY_MINI_SECRET
+    if not (appid and secret):
+        raise WeChatPayError('未配置小程序 appid / secret')
+    data = _wechat_get('https://api.weixin.qq.com/cgi-bin/token', {
+        'grant_type': 'client_credential', 'appid': appid, 'secret': secret,
+    })
+    token = data.get('access_token') or ''
+    if not token:
+        raise WeChatPayError('未取到 access_token')
+    cache.set(ACCESS_TOKEN_CACHE_KEY, token, timeout=7000)
+    if got_lock:
+        cache.delete(ACCESS_TOKEN_LOCK_KEY)
+    return token
+
+
+def get_phone_number(code: str) -> str:
+    """手机号快速验证：组件回调的 code 换手机号。
+
+    仅「非个人主体 + 已完成微信认证」的小程序可用，且按次收费（0.03 元/次，
+    每个小程序有 1000 次体验额度）。个人主体会返回 48001 之类权限错误，
+    上层需捕获后降级为「静默登录」。code 一次性，5 分钟内有效。
+    """
+    if not code:
+        return ''
+    token = wechat_access_token()
+    try:
+        resp = httpx.post(
+            'https://api.weixin.qq.com/wxa/business/getuserphonenumber',
+            params={'access_token': token},
+            json={'code': code},
+            timeout=settings.WXPAY_TIMEOUT,
+        )
+        data = resp.json()
+    except Exception as exc:
+        raise WeChatPayError(f'微信手机号接口请求失败：{exc}') from exc
+
+    errcode = data.get('errcode')
+    if errcode:
+        # access_token 过期（40001/42001）刷新一次再试，其它错误直接抛给上层降级
+        if errcode in (40001, 42001):
+            token = wechat_access_token(force_refresh=True)
+            try:
+                resp = httpx.post(
+                    'https://api.weixin.qq.com/wxa/business/getuserphonenumber',
+                    params={'access_token': token},
+                    json={'code': code},
+                    timeout=settings.WXPAY_TIMEOUT,
+                )
+                data = resp.json()
+            except Exception as exc:
+                raise WeChatPayError(f'微信手机号接口请求失败：{exc}') from exc
+            if data.get('errcode'):
+                raise WeChatPayError(data.get('errmsg') or '手机号获取失败')
+        else:
+            raise WeChatPayError(data.get('errmsg') or '手机号获取失败')
+
+    info = data.get('phone_info') or {}
+    # 优先不带区号的号码；waterMark 里的 purePhoneNumber 才是标准 11 位
+    return info.get('purePhoneNumber') or info.get('phoneNumber') or ''
 
 
 def _wechat_get(url: str, params: dict) -> dict:

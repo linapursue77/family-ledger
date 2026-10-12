@@ -1,4 +1,4 @@
-# 家庭财务通 · 单机全家桶（MySQL + Redis + Django + django-q + nginx）
+# 钱来钱往记账 · 单机全家桶（MySQL + Redis + Django + django-q + nginx）
 #
 # 用法（本文件所在目录执行）：
 #   cp env.production.example .env      # 填好密码与域名

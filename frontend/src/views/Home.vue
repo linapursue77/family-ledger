@@ -16,11 +16,16 @@ const presets = [
   { key: 'last_3months', label: '近3月' },
   { key: 'last_half_year', label: '近半年' },
   { key: 'this_year', label: '今年' },
-  { key: 'last_year', label: '近一年' },
+  { key: 'custom', label: '自定义' },
 ]
 const active = ref('last_week')
 const activeLabel = ref('近1周')
-const showOptions = ref(false)
+// —— 自定义时间区间 ——
+const customStart = ref('') // YYYY-MM-DD
+const customEnd = ref('')
+const showCustom = ref(false)
+const customDraft = ref({ start: '', end: '' })
+const customMin = '2000-01-01'
 const ov = ref(null)
 const loading = ref(true)
 const accounts = ref([])
@@ -38,7 +43,12 @@ let metaLoaded = false
 async function load() {
   loading.value = true
   try {
-    ov.value = await ledgerApi.overview({ preset: active.value })
+    const params = { preset: active.value }
+    if (active.value === 'custom') {
+      params.start = customStart.value
+      params.end = customEnd.value
+    }
+    ov.value = await ledgerApi.overview(params)
     const label = presets.find((p) => p.key === active.value)?.label || ''
     activeLabel.value = label
     await ensureMeta()
@@ -52,8 +62,33 @@ async function load() {
   if (!retOv.value) loadReturns()
 }
 function onPreset(p) {
+  if (p === 'custom') {
+    // 默认给近一年的区间，方便直接确定
+    customDraft.value = {
+      start: customStart.value || ymd(new Date(Date.now() - 364 * 864e5)),
+      end: customEnd.value || ymd(new Date()),
+    }
+    showCustom.value = !showCustom.value
+    return
+  }
+  showCustom.value = false
   active.value = p
-  showOptions.value = false
+  load()
+}
+function applyCustom() {
+  const { start, end } = customDraft.value
+  if (!start || !end) {
+    toast('请选择起止日期')
+    return
+  }
+  if (start > end) {
+    toast('开始日期不能晚于结束日期')
+    return
+  }
+  customStart.value = start
+  customEnd.value = end
+  showCustom.value = false
+  active.value = 'custom'
   load()
 }
 function ymd(d) {
@@ -328,26 +363,37 @@ onMounted(async () => {
     <!-- 记账后回首页的轻提示：自动消失，不打断操作 -->
     <div v-if="pageNotice" class="page-notice">{{ pageNotice }}</div>
 
-    <!-- 时间控件 -->
-    <div class="time-picker-bar" @click="showOptions = !showOptions">
-      <div class="time-picker-left">
-        <span class="time-picker-icon">📅</span>
-        <span class="time-picker-text">{{ activeLabel }}</span>
-      </div>
-      <span class="time-picker-arrow">›</span>
-    </div>
-    <div class="time-picker-options" :class="{ show: showOptions }">
+    <!-- 时间范围：单行胶囊选择器，与报告页同款风格 -->
+    <div class="period-row">
       <span
         v-for="p in presets"
         :key="p.key"
-        class="time-picker-option"
+        class="chip period-chip"
         :class="{ active: active === p.key }"
         @click="onPreset(p.key)"
       >{{ p.label }}</span>
-      <span class="time-picker-option custom">📆 自定义</span>
     </div>
-    <div v-if="ov" class="time-range-display">
-      <span class="time-range-text">{{ ov.range.start }} ~ {{ ov.range.end }}</span>
+    <!-- 自定义区间面板 -->
+    <div v-if="showCustom" class="custom-panel">
+      <input
+        v-model="customDraft.start"
+        type="date"
+        class="custom-date"
+        :max="customDraft.end"
+        :min="customMin"
+      />
+      <span class="custom-sep">至</span>
+      <input
+        v-model="customDraft.end"
+        type="date"
+        class="custom-date"
+        :max="ymd(new Date())"
+        :min="customDraft.start"
+      />
+      <button class="btn-primary custom-ok" @click="applyCustom">确定</button>
+    </div>
+    <div v-if="ov" class="period-range">
+      {{ ov.range.start }} ~ {{ ov.range.end }}
     </div>
 
     <template v-if="ov">
@@ -512,74 +558,62 @@ onMounted(async () => {
   color: #534ab7;
   font-size: 12px;
 }
-.time-picker-bar {
+/* 时间范围胶囊：均分一行，与报告页 .chip 同一套风格 */
+.period-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  background: #f7f6f3;
-  border-radius: 10px;
-  margin: 12px 16px 4px;
-  cursor: pointer;
+  gap: 6px;
+  margin: 12px 16px 0;
 }
-.time-picker-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.time-picker-icon {
-  font-size: 16px;
-}
-.time-picker-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: #26215c;
-}
-.time-picker-arrow {
-  font-size: 18px;
-  color: #c8c6c0;
-}
-.time-picker-options {
-  display: none;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 16px;
-  padding: 12px;
-  background: #fff;
-  border-radius: 10px;
-  border: 0.5px solid #e8e8e8;
-}
-.time-picker-options.show {
-  display: flex;
-}
-.time-picker-option {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  background: #f1efe8;
-  color: #5f5e5a;
-  cursor: pointer;
-}
-.time-picker-option.active {
-  background: #eeedfe;
-  color: #7f77dd;
-  font-weight: 500;
-}
-.time-picker-option.custom {
-  background: linear-gradient(135deg, #7f77dd 0%, #9b8fe8 100%);
-  color: #fff;
-  font-weight: 500;
-}
-.time-range-display {
-  padding: 8px 12px;
-  background: #f7f6f3;
-  border-radius: 8px;
-  margin: 8px 16px;
+.period-chip {
+  flex: 1;
   text-align: center;
+  padding: 6px 0;
+  font-size: 12px;
 }
-.time-range-text {
+.period-chip.active {
+  background: linear-gradient(135deg, #7f77dd, #534ab7);
+  border-color: transparent;
+  font-weight: 500;
+}
+.period-range {
+  margin: 8px 16px 12px;
+  text-align: center;
   font-size: 12px;
   color: #888780;
+}
+/* 自定义区间面板 */
+.custom-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 16px 0;
+  padding: 10px 12px;
+  background: #fff;
+  border: 0.5px solid #e8e8e8;
+  border-radius: 10px;
+}
+.custom-date {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: #26215c;
+  background: #f7f6f3;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+}
+.custom-sep {
+  flex: none;
+  font-size: 12px;
+  color: #888780;
+}
+.custom-ok {
+  flex: none;
+  width: auto;
+  padding: 7px 18px;
+  font-size: 13px;
+  border-radius: 8px;
 }
 .asset-card {
   cursor: pointer;

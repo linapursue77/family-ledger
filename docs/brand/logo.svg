@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- 「钱来钱往记账」品牌 Logo 矢量源文件
+       品牌色：主紫 #7f77dd / 深紫 #534ab7 / 金 #f5c440 / 深金 #d99a1f
+       修改后可用浏览器打开，或在线工具导出任意尺寸 PNG -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7f77dd"/>
+      <stop offset="1" stop-color="#534ab7"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7d060"/>
+      <stop offset="1" stop-color="#e8ae2e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 底：满幅直角（微信要求 logo 不带圆角/白边，展示时平台自动加圆角） -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- 双向循环箭头：钱来 & 钱往 -->
+  <g fill="none" stroke="url(#gold)" stroke-width="52" stroke-linecap="round">
+    <path d="M 790 372 A 300 300 0 0 0 240 330"/>
+    <path d="M 234 652 A 300 300 0 0 0 794 690"/>
+  </g>
+  <polygon points="800,300 900,392 776,432" fill="url(#gold)"/>
+  <polygon points="228,724 128,632 252,592" fill="url(#gold)"/>
+
+  <!-- 金币 -->
+  <circle cx="512" cy="512" r="230" fill="url(#gold)"/>
+  <circle cx="512" cy="512" r="230" fill="none" stroke="#d99a1f" stroke-width="10" opacity="0.45"/>
+  <circle cx="512" cy="512" r="188" fill="none" stroke="#d99a1f" stroke-width="12" opacity="0.5"/>
+
+  <!-- ¥ 符号 -->
+  <g stroke="#b9820f" stroke-width="46" stroke-linecap="round" fill="none">
+    <path d="M 424 392 L 512 540"/>
+    <path d="M 600 392 L 512 540"/>
+    <path d="M 512 540 L 512 668"/>
+    <path d="M 436 566 L 588 566"/>
+    <path d="M 436 622 L 588 622"/>
+  </g>
+</svg>

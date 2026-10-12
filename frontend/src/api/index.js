@@ -37,6 +37,11 @@ export const authApi = {
   me: () => unwrap(client.get('/auth/me/')),
   // 个人资料：昵称 / 头像 / 隐私额度（每人一份，保存即生效）
   updateProfile: (payload) => unwrap(client.patch('/auth/profile/', payload)),
+  // 设置 / 修改登录密码：无密码（纯微信登录）时不用传 old_password
+  updatePassword: (payload) => unwrap(client.post('/auth/password/', payload)),
+  // 忘记密码：发验证码 → 用验证码重置
+  sendSmsCode: (payload) => unwrap(client.post('/auth/sms/send/', payload)),
+  resetPassword: (payload) => unwrap(client.post('/auth/password/reset/', payload)),
 }
 
 export const accountApi = {

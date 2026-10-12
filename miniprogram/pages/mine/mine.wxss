@@ -66,6 +66,15 @@
   font-weight: 700;
   font-size: 30rpx;
 }
+.pwd-form {
+  padding: 8rpx 0 4rpx;
+}
+.pwd-note {
+  font-size: 22rpx;
+  color: var(--text-sub);
+  line-height: 1.6;
+  padding: 8rpx 0 0;
+}
 .logout-area {
   padding: 40rpx 24rpx;
 }

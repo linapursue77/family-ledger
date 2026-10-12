@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""家庭财务通 · 后端配置
+"""钱来钱往记账 · 后端配置
 
 设计对齐 TestHub：
 - DRF + SimpleJWT 认证（双 Token + 刷新轮换 + 黑名单）
@@ -208,13 +208,32 @@ Q_CLUSTER = {
 
 # ---------------------------------------------------------------- API 文档
 SPECTACULAR_SETTINGS = {
-    'TITLE': '家庭财务通 API',
-    'DESCRIPTION': '家庭财务通 · 后端接口文档',
+    'TITLE': '钱来钱往记账 API',
+    'DESCRIPTION': '钱来钱往记账 · 后端接口文档',
     'VERSION': '0.1.0 (MVP)',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': r'/api/v1',
 }
+
+# ---------------------------------------------------------------- 短信验证码（找回密码）
+# 国内短信服务要求「企业主体 + 签名/模板报备」，个人主体办不了。
+# 所以默认 provider=console：验证码只写日志、不真发短信，但整条找回密码流程
+# 能完整跑通（从后端日志里抄验证码即可），零成本、零依赖。
+# 有企业资质后：配 SMS_PROVIDER=aliyun|tencent + 密钥 + 签名 + 模板，代码无需改动。
+SMS_PROVIDER = config('SMS_PROVIDER', default='console')
+SMS_ACCESS_KEY = config('SMS_ACCESS_KEY', default='')
+SMS_ACCESS_SECRET = config('SMS_ACCESS_SECRET', default='')
+SMS_APP_ID = config('SMS_APP_ID', default='')          # 腾讯云专用 SDKAppID
+SMS_SIGN_NAME = config('SMS_SIGN_NAME', default='')    # 短信签名，如「钱来钱往」
+SMS_TEMPLATE_RESET = config('SMS_TEMPLATE_RESET', default='')   # 重置密码模板
+SMS_TEMPLATE_BIND = config('SMS_TEMPLATE_BIND', default='')     # 绑定手机号模板
+SMS_CODE_LENGTH = config('SMS_CODE_LENGTH', default=6, cast=int)
+SMS_CODE_TTL = config('SMS_CODE_TTL', default=300, cast=int)          # 验证码有效期(秒)
+SMS_SEND_INTERVAL = config('SMS_SEND_INTERVAL', default=60, cast=int)  # 重发间隔(秒)
+SMS_MAX_TRIES = config('SMS_MAX_TRIES', default=5, cast=int)           # 最多校验几次
+SMS_DAILY_LIMIT_PER_PHONE = config('SMS_DAILY_LIMIT_PER_PHONE', default=10, cast=int)
+SMS_DAILY_LIMIT_PER_IP = config('SMS_DAILY_LIMIT_PER_IP', default=30, cast=int)
 
 # ---------------------------------------------------------------- 会员权益闸门
 # False（当前）：付费权益对所有人开放，先把功能用起来攒用户粘性；
@@ -277,7 +296,11 @@ TEMPLATES = [
     },
 ]
 
+# 密码规则：字母+数字组合、不低于 6 位。挂在全局校验器上，
+# 注册 / 找回密码 / 设置密码 三处共用同一份规则，无需各写一遍。
+# 顺序即提示优先级：组合规则放最前，用户最先看到「必须包含字母和数字」。
 AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'apps.users.validators.LetterAndDigitValidator'},
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
      'OPTIONS': {'min_length': 6}},

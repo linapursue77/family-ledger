@@ -10,6 +10,6 @@ class UserAdmin(BaseUserAdmin):
     list_display = ('id', 'username', 'nickname', 'phone', 'is_staff', 'date_joined')
     search_fields = ('username', 'phone', 'nickname')
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('家庭财务通', {'fields': ('nickname', 'avatar_url', 'phone', 'openid',
+        ('钱来钱往记账', {'fields': ('nickname', 'avatar_url', 'phone', 'openid',
                                    'privacy_limit_cents')}),
     )
