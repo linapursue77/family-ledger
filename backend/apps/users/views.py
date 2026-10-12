@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 """认证相关接口。"""
+import logging
+from urllib.parse import quote, urlparse
+
+from django.conf import settings
 from django.contrib.auth import authenticate
+from django.core import signing
+from django.http import HttpResponseBadRequest
+from django.shortcuts import redirect
+from django.urls import reverse
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -10,8 +18,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.accounts.views import book_labels
 from apps.core.response import BusinessError, api_response
 from apps.families.models import Family, FamilyMember, Threshold
+from apps.membership import pay as wxpay
 from apps.users.models import User
 from apps.users.serializers import LoginSerializer, RegisterSerializer, UserSerializer
+
+logger = logging.getLogger('django.request')
+# 网页授权 state 的签名盐值与有效期
+OAUTH_SALT = 'wechat-oauth'
+OAUTH_MAX_AGE = 10 * 60
 
 
 def _issue_token(user: User) -> dict:
@@ -133,3 +147,107 @@ class ProfileUpdateView(APIView):
             setattr(request.user, key, value)
         request.user.save(update_fields=list(ser.validated_data.keys()))
         return api_response(UserSerializer(request.user).data, message='已更新')
+
+
+# --------------------------------------------------------------------------- 微信身份
+def _bind_openid(user: User, openid: str) -> bool:
+    """把 openid 绑到当前账号；已被别人占用时不覆盖，也不让授权流程中断。"""
+    if not openid or user.openid == openid:
+        return False
+    if User.objects.filter(openid=openid).exclude(pk=user.pk).exists():
+        logger.warning('openid 已被其它账号占用 user=%s', user.id)
+        return False
+    user.openid = openid
+    user.save(update_fields=['openid'])
+    return True
+
+
+def _safe_next(url: str) -> str:
+    """只允许跳回本站路径，避免授权回调变成开放重定向。
+
+    前端是 hash 路由（/#/member），绝对地址要保留 query 与 hash，否则跳丢页面。
+    """
+    if not url or url.startswith('//') or url.startswith('/\\'):
+        return '/'
+    parsed = urlparse(url)
+    if parsed.scheme and not parsed.netloc:  # javascript: 之类
+        return '/'
+    if parsed.netloc:
+        target = (parsed.path or '/') or '/'
+        if parsed.query:
+            target += '?' + parsed.query
+        if parsed.fragment:
+            target += '#' + parsed.fragment
+        return target if target.startswith('/') else '/'
+    return url if url.startswith('/') else '/'
+
+
+class WechatOpenidView(APIView):
+    """小程序支付前绑定身份：wx.login 拿 code，后端换 openid 存到当前账号。"""
+
+    permission_classes = [IsAuthenticated]
+
+    class _InlineSerializer(serializers.Serializer):
+        code = serializers.CharField(max_length=128)
+
+    def post(self, request):
+        ser = self._InlineSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            openid = wxpay.jscode2session(ser.validated_data['code'])
+        except BusinessError:
+            raise
+        except Exception as exc:
+            logger.warning('微信 code2session 失败: %s', exc)
+            raise BusinessError('微信登录失败，请重试')
+        if not openid:
+            raise BusinessError('未取到微信身份，请重试')
+        _bind_openid(request.user, openid)
+        return api_response({'openid_bound': True}, message='已绑定微信')
+
+
+class WechatAuthorizeView(APIView):
+    """公众号网页授权入口：302 到微信授权页（snsapi_base 静默，用户无感）。
+
+    授权完微信带 code 回 callback，绑好 openid 再跳回 next 指定的前端页面。
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not (settings.WXPAY_APPID and settings.WXPAY_APP_SECRET):
+            raise BusinessError('未配置公众号 appid / secret，无法完成微信授权')
+        next_url = _safe_next(request.GET.get('next') or '/')
+        state = signing.dumps({'uid': request.user.id, 'next': next_url}, salt=OAUTH_SALT)
+        callback = request.build_absolute_uri(reverse('auth-wechat-callback'))
+        url = ('https://open.weixin.qq.com/connect/oauth2/authorize'
+               f'?appid={settings.WXPAY_APPID}'
+               f'&redirect_uri={quote(callback, safe="")}'
+               '&response_type=code&scope=snsapi_base'
+               f'&state={quote(state)}#wechat_redirect')
+        return redirect(url)
+
+
+class WechatCallbackView(APIView):
+    """公众号授权回调：code 换 openid → 绑定 → 跳回前端继续支付。"""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            data = signing.loads(request.GET.get('state') or '', salt=OAUTH_SALT,
+                                 max_age=OAUTH_MAX_AGE)
+        except Exception:
+            return HttpResponseBadRequest('授权已过期，请重新发起支付')
+
+        user = User.objects.filter(pk=data.get('uid')).first()
+        if not user:
+            return HttpResponseBadRequest('账号不存在')
+        code = request.GET.get('code')
+        if code:
+            try:
+                _bind_openid(user, wxpay.oauth_openid(code))
+            except Exception as exc:
+                logger.warning('网页授权换 openid 失败 user=%s: %s', user.id, exc)
+        return redirect(_safe_next(data.get('next') or '/'))

@@ -127,6 +127,29 @@ export const loanApi = {
   removeRepayment: (id) => unwrap(client.delete(`/loans/repayments/${id}/`)),
 }
 
+export const membershipApi = {
+  // 会员中心首页：权益对比 + 在售套餐 + 我的状态 + 试用配置（游客也可访问）
+  home: () => unwrap(client.get('/membership/')),
+  mine: () => unwrap(client.get('/membership/mine/')),
+  // 领取免费试用（每人一次）
+  trial: () => unwrap(client.post('/membership/trial/')),
+  // 开通 / 续费下单：scene = mini | jsapi | h5，返回调起微信支付所需参数
+  createOrder: (planId, scene, nextUrl) =>
+    unwrap(
+      client.post('/membership/subscribe/', {
+        plan_id: planId,
+        scene,
+        next_url: nextUrl || '',
+      })
+    ),
+  // 订单状态：支付后轮询确认（回调延迟时后端会主动向微信查单）
+  orderStatus: (orderNo) => unwrap(client.get(`/membership/orders/${orderNo}/`)),
+  // 放弃支付：主动关单
+  closeOrder: (orderNo) => unwrap(client.post(`/membership/orders/${orderNo}/close/`)),
+  // 小程序：wx.login 的 code 绑定 openid（JSAPI 支付前必须）
+  bindOpenid: (code) => unwrap(client.post('/auth/wechat/openid/', { code })),
+}
+
 export const importApi = {
   upload: (formData) =>
     unwrap(

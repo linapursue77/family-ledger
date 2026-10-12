@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.ledger',
     'apps.loans',
+    'apps.membership',
 ]
 
 MIDDLEWARE = [
@@ -214,6 +215,38 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': r'/api/v1',
 }
+
+# ---------------------------------------------------------------- 微信支付
+# 会员开通 / 续费走微信支付 v3：微信内 JSAPI 支付（公众号 / 小程序），
+# 微信外浏览器走 H5 支付（mweb_url 跳转）。
+#
+# 开关关掉时（默认）下单接口只在 DEBUG 下走「直接开通」的联调模式，
+# 正式环境会直接报错，避免忘记配置就白送会员。
+WXPAY_ENABLED = config('WXPAY_ENABLED', default=False, cast=bool)
+WXPAY_MCHID = config('WXPAY_MCHID', default='')
+# 公众号 appid / secret：微信浏览器内 JSAPI 支付 + 网页授权取 openid
+WXPAY_APPID = config('WXPAY_APPID', default='')
+WXPAY_APP_SECRET = config('WXPAY_APP_SECRET', default='')
+# 小程序 appid / secret：留空表示不区分，直接用公众号那套
+WXPAY_MINI_APPID = config('WXPAY_MINI_APPID', default=WXPAY_APPID)
+WXPAY_MINI_SECRET = config('WXPAY_MINI_SECRET', default=WXPAY_APP_SECRET)
+# API v3 密钥（商户平台设置，32 位）：用于解密回调与平台证书
+WXPAY_API_V3_KEY = config('WXPAY_API_V3_KEY', default='')
+# 商户 API 证书序列号 + 私钥（apiclient_key.pem）
+WXPAY_SERIAL_NO = config('WXPAY_SERIAL_NO', default='')
+WXPAY_PRIVATE_KEY_PATH = config('WXPAY_PRIVATE_KEY_PATH',
+                                default=str(BASE_DIR / 'certs' / 'apiclient_key.pem'))
+# 也可以直接把 PEM 内容塞进环境变量（部署平台不方便挂文件时用）
+WXPAY_PRIVATE_KEY = config('WXPAY_PRIVATE_KEY', default='')
+# 支付结果通知地址：必须是公网可访问 https 地址
+WXPAY_NOTIFY_URL = config('WXPAY_NOTIFY_URL', default='')
+# H5 支付完成后的回跳页（微信会带着订单跳回这里）
+WXPAY_H5_REDIRECT_URL = config('WXPAY_H5_REDIRECT_URL', default='')
+# 平台证书缓存目录（自动从 /v3/certificates 下载并解密后缓存）
+WXPAY_CERT_DIR = config('WXPAY_CERT_DIR', default=str(BASE_DIR / 'certs' / 'platform'))
+WXPAY_TIMEOUT = config('WXPAY_TIMEOUT', default=10, cast=int)
+# 订单有效期（秒）：超时未支付自动关单
+WXPAY_ORDER_TTL = config('WXPAY_ORDER_TTL', default=15 * 60, cast=int)
 
 # ---------------------------------------------------------------- 模板 / Admin
 # ---------------------------------------------------------------- 前端静态托管

@@ -17,6 +17,7 @@ urlpatterns = [
     path('api/v1/ledger/', include('apps.ledger.urls')),
     path('api/v1/loans/', include('apps.loans.urls')),
     path('api/v1/core/', include('apps.core.urls')),
+    path('api/v1/membership/', include('apps.membership.urls')),
     # API 文档
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),

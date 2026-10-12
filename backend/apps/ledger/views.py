@@ -32,6 +32,10 @@ from apps.families.services import (
 )
 from apps.ledger.models import AISettings, Category, ImportTask, Transaction
 from apps.loans.services import summarize as loan_summary
+from apps.membership.services import has_benefit
+
+# 普通用户可用的报表周期；本月 / 今年 / 近一年 / 自定义区间属 VIP 权益
+FREE_PRESETS = {'last_week', 'last_month', 'last_3months'}
 from apps.ledger.serializers import (
     CategoryCreateSerializer,
     CategorySerializer,
@@ -613,6 +617,12 @@ class ReportView(APIView):
         except ValueError as exc:
             raise BusinessError(str(exc), code=4001)
 
+        # 长周期 / 自定义区间属 VIP 权益，普通用户只能用近 1 周 / 1 月 / 3 月
+        if preset not in FREE_PRESETS and not has_benefit(request.user, 'full_report'):
+            raise BusinessError(
+                f'「{PRESET_LABELS.get(preset, preset)}」是 VIP 权益，'
+                '开通后可用本月 / 今年 / 近一年 / 自定义区间')
+
         txs = (Transaction.objects
                .filter(family=family, transaction_date__range=(start, end))
                .select_related('category'))
@@ -714,6 +724,9 @@ class ReportInsightView(APIView):
         if tx_type not in (INCOME, EXPENSE):
             raise BusinessError('type 只能是 income 或 expense', code=4001)
         account_id = (request.query_params.get('account_id') or '').strip()
+
+        if not has_benefit(request.user, 'ai_insight'):
+            raise BusinessError('AI 财务分析是 VIP 权益，开通后可查看')
 
         try:
             start, end = resolve(
@@ -854,6 +867,8 @@ class AIConfigView(APIView):
 
     def get(self, request):
         member = require_member(request.user)
+        if not has_benefit(request.user, 'ai_config'):
+            raise BusinessError('自定义 AI 模型是 VIP 权益')
         cfg = get_config(member.family)
         return api_response({
             'enabled': bool(cfg['enabled']),
@@ -868,6 +883,8 @@ class AIConfigView(APIView):
 
     def put(self, request):
         member = require_member(request.user)
+        if not has_benefit(request.user, 'ai_config'):
+            raise BusinessError('自定义 AI 模型是 VIP 权益')
         data = request.data or {}
         row, _ = AISettings.objects.get_or_create(family=member.family)
         # ★ 增量更新：只改请求里带了的字段，
@@ -938,6 +955,8 @@ class ImportTaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
     # -------------------------------------------------- 上传解析
     def create(self, request, *args, **kwargs):
         member = require_member(request.user)
+        if not has_benefit(request.user, 'bulk_import'):
+            raise BusinessError('账单批量导入是 VIP 权益，开通后可一键导入')
         file_obj = request.FILES.get('file')
         if file_obj is None:
             raise BusinessError('请选择账单文件', code=4001)

@@ -16,8 +16,16 @@ from apps.families.serializers import (
 )
 from apps.families.services import build_viewer_ctx, require_member
 
-# 一个家庭最多 5 位成员（1 主账号 + 4 子账号）：伴侣之外还能拉父母、成年子女、室友
+# 一个家庭默认最多 5 位成员（1 主账号 + 4 子账号）：伴侣之外还能拉父母、成年子女、室友
+# 主账号开了 VIP 就扩到 10 人——会员权益按家庭生效，全家人一起受益
 MAX_FAMILY_MEMBERS = 5
+
+
+def _family_limit(user) -> int:
+    """家庭成员上限：本人是 VIP 就放开到 VIP 档。"""
+    from apps.membership.services import member_limit
+
+    return member_limit(user)
 # 新成员账本按空缺顺位分配；三个账本都用完后并入「共同账本」，靠归属人区分
 BOOK_FALLBACK = (FamilyMember.BOOK_WIFE, FamilyMember.BOOK_HUSBAND, FamilyMember.BOOK_SHARED)
 BOOK_CODES = {FamilyMember.BOOK_HUSBAND, FamilyMember.BOOK_WIFE, FamilyMember.BOOK_SHARED}
@@ -70,7 +78,7 @@ class FamilyMeView(APIView):
             'my_id': member.id,
             'my_book_type': member.book_type,
             'my_permissions': member.effective_permissions,
-            'member_limit': MAX_FAMILY_MEMBERS,
+            'member_limit': _family_limit(request.user),
             'book_labels': family.book_labels or {},
         })
 
@@ -99,7 +107,7 @@ class InvitationCreateView(APIView):
             })
         return api_response({
             'items': items,
-            'member_limit': MAX_FAMILY_MEMBERS,
+            'member_limit': _family_limit(request.user),
             'member_count': member.family.members.count(),
         })
 
@@ -108,9 +116,11 @@ class InvitationCreateView(APIView):
         ser.is_valid(raise_exception=True)
         member = require_member(request.user)
 
-        if member.family.members.count() >= MAX_FAMILY_MEMBERS:
+        limit = _family_limit(request.user)
+        if member.family.members.count() >= limit:
             raise BusinessError(
-                f'家庭已有 {MAX_FAMILY_MEMBERS} 位成员，请先在成员列表移除一位再邀请')
+                f'家庭已有 {limit} 位成员，请先在成员列表移除一位再邀请；'
+                '升级 VIP 可扩到 10 人')
 
         invitation, token = Invitation.issue(
             family=member.family,
@@ -188,7 +198,7 @@ class InvitationPreviewView(APIView):
             'permissions': {**DEFAULT_PERMISSIONS, **(inv.permissions or {})},
             'expires_at': inv.expires_at,
             'member_count': inv.family.members.count(),
-            'member_limit': MAX_FAMILY_MEMBERS,
+            'member_limit': _family_limit(request.user),
         })
 
 
@@ -205,8 +215,9 @@ class InvitationAcceptView(APIView):
         if FamilyMember.objects.filter(user=user).exists():
             raise BusinessError('你已经在一个家庭里了，如需换家庭请先让主账号移除你')
         family = inv.family
-        if family.members.count() >= MAX_FAMILY_MEMBERS:
-            raise BusinessError(f'该家庭已满 {MAX_FAMILY_MEMBERS} 位成员，请让主账号先移除一位')
+        limit = _family_limit(family.owner)
+        if family.members.count() >= limit:
+            raise BusinessError(f'该家庭已满 {limit} 位成员，请让主账号先移除一位')
 
         used = set(family.members.values_list('book_type', flat=True))
         book = next((b for b in BOOK_FALLBACK if b not in used), FamilyMember.BOOK_SHARED)

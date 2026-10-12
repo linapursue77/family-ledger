@@ -14,4 +14,6 @@ PyYAML>=6.0
 chardet>=5.0,<7
 Pillow>=11.0
 httpx>=0.28
+# 微信支付 v3：RSA 签名与回调解密（不接支付可不加）
+cryptography>=42.0
 gunicorn>=23.0

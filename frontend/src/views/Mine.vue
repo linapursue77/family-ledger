@@ -1,7 +1,15 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { accountApi, authApi, exportTransactions, familyApi, ledgerApi, loanApi } from '@/api'
+import {
+  accountApi,
+  authApi,
+  exportTransactions,
+  familyApi,
+  ledgerApi,
+  loanApi,
+  membershipApi,
+} from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { yuan } from '@/utils/money'
 
@@ -163,6 +171,15 @@ const loanText = computed(() => {
   return parts.join(' · ')
 })
 
+// 会员：菜单显示到期/试用状态
+const vipInfo = ref(null)
+const vipText = computed(() => {
+  const m = vipInfo.value
+  if (!m) return ''
+  if (!m.is_vip) return m.can_trial ? `可试用 ${m.trial_days} 天` : '未开通'
+  return m.is_trial ? `试用剩 ${m.remain_days} 天` : `剩 ${m.remain_days} 天`
+})
+
 // 收益管理：菜单上直接显示累计收益，没开收益管理时留空
 const retSum = ref(null)
 const retText = computed(() => {
@@ -207,6 +224,11 @@ async function load() {
     retSum.value = await accountApi.returns()
   } catch (e) {
     retSum.value = null
+  }
+  try {
+    vipInfo.value = await membershipApi.mine()
+  } catch (e) {
+    vipInfo.value = null
   }
 }
 
@@ -336,6 +358,12 @@ onMounted(() => {
       <div class="menu-item" @click="router.push('/accounts')">
         <span class="menu-icon">💳</span>
         <span class="menu-text">账户管理</span>
+        <span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item" @click="router.push('/member')">
+        <span class="menu-icon">👑</span>
+        <span class="menu-text">会员中心</span>
+        <span class="menu-value" :class="{ 'vip-on': vipInfo?.is_vip }">{{ vipText }}</span>
         <span class="menu-arrow">›</span>
       </div>
     </div>
@@ -652,6 +680,10 @@ onMounted(() => {
 .menu-value {
   font-size: 12px;
   color: #888780;
+}
+.menu-value.vip-on {
+  color: #a1791b;
+  font-weight: 600;
 }
 .menu-arrow {
   color: #c8c6c0;

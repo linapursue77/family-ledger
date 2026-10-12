@@ -2,6 +2,8 @@
 .env
 deploy/.env
 deploy/certs/
+# 微信支付商户私钥与平台证书
+backend/certs/
 
 # ---- Python ----
 __pycache__/
