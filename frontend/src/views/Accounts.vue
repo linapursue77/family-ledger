@@ -2,10 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { accountApi, familyApi } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 import AccountEditSheet from '@/components/AccountEditSheet.vue'
 import { toast } from '@/utils/toast'
 
 const router = useRouter()
+const auth = useAuthStore()
 const data = ref(null)
 const loading = ref(true)
 
@@ -13,6 +15,9 @@ const loading = ref(true)
 const showEdit = ref(false)
 const editTarget = ref(null)
 const defaultBook = ref('shared')
+
+// 收益概览：只在入口行显示一句「累计/今年收益」，详情进收益管理页
+const ret = ref(null)
 
 // 修改账本名称
 const showRename = ref(false)
@@ -75,9 +80,29 @@ async function load() {
   }
 }
 
+async function loadReturns() {
+  try {
+    ret.value = await accountApi.returns()
+  } catch (e) {
+    ret.value = null
+  }
+}
+
+// 收益概览的带符号金额：分 → 元
+function signed(cents) {
+  const c = Number(cents || 0)
+  const sign = c > 0 ? '+' : c < 0 ? '-' : ''
+  return `${sign}¥${money(Math.abs(c) / 100)}`
+}
+function retCls(cents) {
+  const c = Number(cents || 0)
+  return c > 0 ? 'up' : c < 0 ? 'down' : ''
+}
+
 function openCreate(bookType) {
   editTarget.value = null
-  defaultBook.value = bookType || 'shared'
+  // 未指定账本时默认建在「我的账本」里，与记账页的默认账本保持一致
+  defaultBook.value = bookType || auth.member?.book_type || 'shared'
   showEdit.value = true
 }
 function openEdit(account) {
@@ -104,9 +129,15 @@ async function saveRename() {
   }
 }
 
+function onSaved() {
+  load()
+  loadReturns()
+}
+
 onMounted(() => {
   load()
   loadFamily()
+  loadReturns()
 })
 </script>
 
@@ -155,6 +186,22 @@ onMounted(() => {
         <span class="ll-arrow">›</span>
       </div>
 
+      <!-- 收益管理：一年收益变化 + 今年收益对净资产的影响 -->
+      <div class="loan-line" @click="router.push('/returns')">
+        <span class="ll-ic ret-ic">📈</span>
+        <div class="ll-main">
+          <div class="ll-title">收益管理</div>
+          <div class="ll-sub">
+            <template v-if="ret?.has_invest">
+              <span :class="retCls(ret.profit_cents)">累计 {{ signed(ret.profit_cents) }}</span>
+              <span :class="retCls(ret.year_profit_cents)">今年 {{ signed(ret.year_profit_cents) }}</span>
+            </template>
+            <span v-else>一年收益变化 · 今年收益对总资产的影响</span>
+          </div>
+        </div>
+        <span class="ll-arrow">›</span>
+      </div>
+
       <!-- 按账本分组 -->
       <div v-for="g in groups" :key="g.book_type" class="book-group">
         <div class="book-head">
@@ -194,7 +241,7 @@ onMounted(() => {
       :account="editTarget"
       :default-book="defaultBook"
       @close="showEdit = false"
-      @saved="load"
+      @saved="onSaved"
     />
 
     <!-- 修改账本名称 -->
@@ -333,6 +380,16 @@ onMounted(() => {
   color: #c8c6c0;
   font-size: 18px;
   line-height: 1;
+}
+/* 收益管理入口 */
+.ret-ic {
+  background: #e6f4ee;
+}
+.up {
+  color: #1d9e75;
+}
+.down {
+  color: #d03b3b;
 }
 .book-group {
   margin: 0 16px 18px;

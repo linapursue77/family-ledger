@@ -190,15 +190,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return api_response(dataclasses.asdict(view))
 
     # -------------------------------------------------- 修改
-    def update(self, request, *args, **kwargs):
-        """MVP 不开放改账单。
-
-        改金额必须同步冲正账户余额，ModelViewSet 默认的 update 直接落库会账实不符；
-        记错了请删除后重记（删除会反向冲正）。
-        """
-        raise BusinessError('账单不支持修改；记错了请删除后重新记录', code=4003)
-
-    partial_update = update
+    # update / partial_update 在下方 destroy 之前定义：
+    # 修改必须冲正余额，不能走 ModelViewSet 默认实现，也不能简单拦截。
 
     # -------------------------------------------------- 记账
     def create(self, request, *args, **kwargs):
@@ -273,6 +266,73 @@ class TransactionViewSet(viewsets.ModelViewSet):
             'privacy': privacy_hint,
             'threshold': threshold_hint,
         }, message='已保存', http_status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        """PATCH/PUT /ledger/transactions/{id}/ —— 修改一笔流水。
+
+        ★ 金额、类型、账户都可能变，所以必须先把旧流水对余额的影响冲正、再按新值重新应用，
+          两步放在同一个事务里，避免改金额导致账户余额凭空多/少一笔。
+        """
+        return self._update_tx(request, partial=kwargs.pop('partial', False))
+
+    def partial_update(self, request, *args, **kwargs):
+        return self._update_tx(request, partial=True)
+
+    def _update_tx(self, request, partial):
+        member = require_member(request.user)
+        tx = self.get_object()
+
+        if tx.type in LOAN_TYPES:
+            raise BusinessError('这是借钱来往生成的记录，请到「借钱来往」里修改', code=4003)
+        if str(tx.user_id) != str(request.user.id):
+            raise BusinessError('只能修改自己记录的账单', code=4003)
+
+        # 该序列化器只用于校验入参，写库由下面的事务统一处理
+        ser = TransactionCreateSerializer(data=request.data, partial=partial)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        # 账户：换账户时同样要校验落在自己可见的账户上
+        account = tx.account
+        if 'account' in data:
+            account_id = data.get('account')
+            if account_id:
+                account = visible_accounts(member.family, request.user).filter(id=account_id).first()
+                if account is None:
+                    raise BusinessError('账户不存在或无权记账到该账户')
+            else:
+                account = None
+
+        if 'category' in data:
+            category_id = data.get('category')
+            # 前端传空串表示「交给规则引擎重新判定」
+            tx.category = Category.objects.filter(id=category_id).first() if category_id else None
+
+        tx_type = data.get('type', tx.type)
+        amount_cents = to_cents(data['amount']) if 'amount' in data else tx.amount_cents
+        merchant = data.get('merchant', tx.merchant) if 'merchant' in data else tx.merchant
+
+        if 'transaction_date' in data:
+            tx.transaction_date = data.get('transaction_date') or tx.transaction_date
+        if 'description' in data:
+            tx.description = data.get('description') or ''
+        if 'is_private' in data:
+            tx.is_private = bool(data.get('is_private')) and tx_type == 'expense'
+
+        with transaction.atomic():
+            # 先冲正旧值（用旧的账户/类型/金额），再按新值应用
+            self._apply_balance(tx.account, tx.type, tx.amount_cents, reverse=True)
+            tx.account = account
+            tx.type = tx_type
+            tx.amount_cents = amount_cents
+            tx.merchant = merchant
+            tx.dedup_hash = dedup_hash(tx.transaction_date, amount_cents, merchant)
+            tx.save()
+            self._apply_balance(account, tx_type, amount_cents)
+
+        return api_response({
+            'transaction': dataclasses.asdict(to_transaction_view(tx, build_viewer_ctx(member))),
+        }, message='已更新')
 
     def destroy(self, request, *args, **kwargs):
         """删除即反向冲正账户余额（不做物理删除更好，MVP 先冲正后删除）。"""
@@ -401,6 +461,49 @@ class TransactionViewSet(viewsets.ModelViewSet):
             locked = account
         locked.balance_cents = locked.balance_cents + sign * int(amount_cents)
         locked.save(update_fields=['balance_cents', 'updated_at'])
+
+
+class MerchantHistoryView(APIView):
+    """GET /ledger/merchants/history/?category_id=&limit=5 —— 备注历史。
+
+    记账时同一个分类下经常重复输入同样的备注（常去的店、固定开销名目），
+    这里按分类回传该家庭最近用过的备注，去重后取前 N 条，供前端做快捷选择。
+
+    ★ 私密消费的备注不会外泄：只取本人记的流水，不跨成员汇总。
+    """
+
+    permission_classes = [IsAuthenticated, IsFamilyMember]
+
+    def get(self, request):
+        member = require_member(request.user)
+        category_id = (request.query_params.get('category_id') or '').strip()
+        if not category_id:
+            return api_response([])
+
+        try:
+            limit = int(request.query_params.get('limit') or 5)
+        except (TypeError, ValueError):
+            limit = 5
+        limit = max(1, min(limit, 20))
+
+        rows = (Transaction.objects
+                .filter(family=member.family, category_id=category_id, user=request.user)
+                .exclude(merchant='')
+                .exclude(merchant__isnull=True)
+                .order_by('-transaction_date', '-created_at')
+                .values_list('merchant', flat=True))
+
+        # ★ 只保留最近一次使用的顺序，同时去掉重复项
+        seen, history = set(), []
+        for name in rows.iterator():
+            text = (name or '').strip()
+            if text and text not in seen:
+                seen.add(text)
+                history.append(text)
+            if len(history) >= limit:
+                break
+
+        return api_response(history)
 
 
 class OverviewView(APIView):
@@ -544,7 +647,7 @@ class ReportView(APIView):
         for item in categories:
             item['count'] = count_by_cat.get(item['category_id'], 0)
 
-        # 成员分布补上所属账本：前端据此用与首页同一套头像（😊 老公 / 😍 老婆）
+        # 成员分布补上所属账本：前端据此用与首页同一套账本配色
         book_map = {str(m.user_id): m.book_type for m in family.members.all()}
         by_member = group_by_member(views, tx_type, member_nicknames(family))
         for item in by_member:

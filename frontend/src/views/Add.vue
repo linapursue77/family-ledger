@@ -1,21 +1,51 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ledgerApi, accountApi } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+import { yuan } from '@/utils/money'
 import dayjs from 'dayjs'
 import { toast } from '@/utils/toast'
 
 const router = useRouter()
+const route = useRoute()
+const auth = useAuthStore()
+
+// ---------------- 编辑模式：从首页点账单进来时带 ?id=
+const editingId = ref('')
+const isEdit = computed(() => !!editingId.value)
 const types = [
   { key: 'expense', label: '支出' },
   { key: 'income', label: '收入' },
-  { key: 'transfer', label: '转账' },
+  { key: 'transfer', label: '借还' },
 ]
 const activeType = ref('expense')
 const categories = ref([])
 const accounts = ref([])
 const categoryId = ref('')
 const accountId = ref('')
+
+// ---------------- 账本：默认跟随登录身份，只展示家庭里真实存在的账本
+const DEFAULT_BOOK = { shared: '共同账本', husband: '账本一', wife: '账本二' }
+const BOOK_ORDER = ['husband', 'wife', 'shared']
+/** 我在家庭里的账本（主账号=账本一、第二人=账本二…） */
+const myBook = computed(() => auth.member?.book_type || 'husband')
+const bookType = ref('')
+function bookName(type) {
+  return auth.family?.book_labels?.[type] || DEFAULT_BOOK[type] || type
+}
+/**
+ * 只保留真实存在过账户的账本：系统固定三本账，
+ * 但家庭不一定每本都建了账户，没建的不该出现在选择里。
+ */
+const existingBooks = computed(() => {
+  const used = new Set(accounts.value.map((a) => a.book_type))
+  return BOOK_ORDER.filter((b) => used.has(b))
+})
+/** 当前账本下的账户；账本为空表示不过滤 */
+const visibleAccounts = computed(() =>
+  bookType.value ? accounts.value.filter((a) => a.book_type === bookType.value) : accounts.value,
+)
 const amount = ref('')
 const merchant = ref('')
 const description = ref('')
@@ -51,55 +81,24 @@ async function submitCat() {
   }
 }
 
-// ---------------- 语音输入（备注）
-// 国内 Chrome 走 Google 语音服务常常不可用，所以必须先探测能力，
-// 不支持就明确提示，而不是点了没反应
-const speechOK = !!(
-  typeof window !== 'undefined' &&
-  (window.SpeechRecognition || window.webkitSpeechRecognition)
-)
-const listening = ref(false) // 备注语音是否正在听
-let recognizer = null
-
-function startVoice() {
-  if (!speechOK) return toast('当前浏览器不支持语音输入，请手动输入')
-  if (listening.value) {
-    // 录音中再点一次 = 停止
-    if (recognizer) recognizer.stop()
-    listening.value = false
+// ---------------- 备注历史：同一分类下最近用过的备注，最多 5 条
+const merchantHistory = ref([])
+async function loadMerchantHistory() {
+  if (!categoryId.value) {
+    merchantHistory.value = []
     return
   }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-  recognizer = new SR()
-  recognizer.lang = 'zh-CN'
-  recognizer.interimResults = false
-  recognizer.maxAlternatives = 1
-  listening.value = true
-  recognizer.onresult = (e) => {
-    const text = (e.results?.[0]?.[0]?.transcript || '').trim()
-    if (!text) return
-    merchant.value = merchant.value ? `${merchant.value} ${text}` : text
-    toast('已填入备注')
-  }
-  recognizer.onerror = (e) => {
-    listening.value = false
-    const map = {
-      'not-allowed': '没有麦克风权限，请在浏览器设置里允许',
-      'service-not-allowed': '语音服务不可用，请手动输入',
-      'no-speech': '没听到声音，请再说一次',
-    }
-    toast(map[e.error] || '语音识别失败，请重试')
-  }
-  recognizer.onend = () => {
-    listening.value = false
-  }
   try {
-    recognizer.start()
+    const list = await ledgerApi.merchantHistory({ category_id: categoryId.value })
+    merchantHistory.value = Array.isArray(list) ? list : []
   } catch (e) {
-    listening.value = false
-    toast('语音启动失败，请重试')
+    merchantHistory.value = []
   }
 }
+// 分类一换就重新拉历史（切换类型时 categoryId 也会被重置）
+watch(categoryId, () => {
+  loadMerchantHistory()
+})
 
 // 日期：默认今天，点开展开日历可改到过去任意一天（不允许选未来）
 const txDate = ref(dayjs().format('YYYY-MM-DD'))
@@ -178,23 +177,70 @@ async function loadCategories() {
   } catch (e) {
     console.error(e)
   }
+  await loadMerchantHistory()
 }
 async function loadAccounts() {
   try {
     const d = await accountApi.list()
     accounts.value = d.items || d || []
-    // 「智能推荐」：默认选中第一个账户，避免漏选导致流水没有归属账户
-    if (accounts.value.length && !accountId.value) {
-      accountId.value = accounts.value[0].id
+    // 账本默认跟随登录身份：优先我自己的账本，自己名下没账户再退到共同账本
+    if (!bookType.value) {
+      const preferred = [myBook.value, 'shared', ...BOOK_ORDER]
+      bookType.value =
+        preferred.find((b) => accounts.value.some((a) => a.book_type === b)) ||
+        (accounts.value[0]?.book_type ?? 'shared')
+    }
+    // 「智能推荐」：默认选中该账本第一个账户，避免漏选导致流水没有归属账户
+    const pool = visibleAccounts.value.length ? visibleAccounts.value : accounts.value
+    if (pool.length && !accountId.value) {
+      accountId.value = pool[0].id
     }
   } catch (e) {
     /* ignore */
   }
 }
+
+function onBook(type) {
+  bookType.value = type
+  accountId.value = visibleAccounts.value[0]?.id || ''
+}
+
+/** 快捷条/备注行里的短日期：今天直接显示「今天」 */
+const shortDate = computed(() =>
+  txDate.value === todayStr.value ? '今天' : dayjs(txDate.value).format('M月D日'),
+)
 function onType(t) {
   activeType.value = t
   categoryId.value = ''
   loadCategories()
+}
+
+/** 编辑模式：把已有流水回填进表单（金额由分转回元） */
+async function loadEditing() {
+  const id = route.query.id
+  if (!id) return
+  editingId.value = String(id)
+  try {
+    const t = await ledgerApi.txDetail(id)
+    if (!t) return
+    activeType.value = t.type || 'expense'
+    await loadCategories()
+    categoryId.value = t.category_id || ''
+    amount.value = String(yuan(t.amount_cents ?? 0))
+    merchant.value = t.merchant || ''
+    description.value = t.description || ''
+    isPrivate.value = !!t.is_private
+    txDate.value = (t.transaction_date || '').slice(0, 10) || todayStr.value
+    // 账户：先等账户列表就位，再定位到该账户所属的账本
+    await loadAccounts()
+    const acc = accounts.value.find((a) => a.id === t.account_id)
+    if (acc) {
+      bookType.value = acc.book_type
+      accountId.value = acc.id
+    }
+  } catch (e) {
+    toast(e.message || '加载账单失败')
+  }
 }
 async function onSave() {
   const amt = Number(amount.value)
@@ -203,7 +249,7 @@ async function onSave() {
   if (!accountId.value) return toast('请选择账户')
   saving.value = true
   try {
-    const res = await ledgerApi.createTx({
+    const payload = {
       type: activeType.value,
       amount: String(amt),
       account: accountId.value || null,
@@ -212,7 +258,13 @@ async function onSave() {
       description: description.value,
       transaction_date: txDateTime(),
       is_private: isPrivate.value && activeType.value === 'expense',
-    })
+    }
+    if (isEdit.value) {
+      await ledgerApi.updateTx(editingId.value, payload)
+      router.push({ path: '/', query: { notice: '已保存修改' } })
+      return
+    }
+    const res = await ledgerApi.createTx(payload)
     const t = res.threshold || {}
     let msg = '已记账'
     if (t.action === 'notify') msg = '已记账，将通知对方'
@@ -227,47 +279,89 @@ async function onSave() {
     saving.value = false
   }
 }
-onMounted(() => {
-  loadCategories()
-  loadAccounts()
+onMounted(async () => {
+  // 刷新后 store 里的成员信息是空的，先补齐才能按登录身份选账本
+  if (!auth.member && auth.token) {
+    try {
+      await auth.fetchMe()
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  if (route.query.id) {
+    await loadEditing()
+  } else {
+    loadCategories()
+    await loadAccounts()
+  }
 })
 </script>
 
 <template>
   <div class="page add-form">
-    <!-- 金额 -->
-    <div class="form-group">
-      <label class="form-label">金额</label>
-      <div class="amount-row">
-        <span class="amount-symbol">¥</span>
-        <input v-model="amount" type="number" class="amount-input" placeholder="0.00" />
+    <!-- 编辑态：给个明确出处，避免用户以为在记新账 -->
+    <div v-if="isEdit" class="edit-bar">
+      <span class="edit-tip">正在修改已记录的账单</span>
+      <span class="edit-cancel" @click="router.push('/')">取消</span>
+    </div>
+
+    <!-- 顶部类型条：支出 / 收入 / 转账，选中为胶囊高亮；＋ 新增分类 -->
+    <div class="type-bar">
+      <div
+        v-for="t in types"
+        :key="t.key"
+        class="type-pill"
+        :class="{ active: activeType === t.key }"
+        @click="onType(t.key)"
+      >{{ t.label }}</div>
+      <span class="bar-spacer"></span>
+      <span class="bar-add" title="新增分类" @click="openAddCat">＋</span>
+    </div>
+
+    <!-- 分类网格：5 列大图标，参考常见记账 App 的宫格样式 -->
+    <div class="category-grid">
+      <div
+        v-for="c in categories"
+        :key="c.id"
+        class="category-cell"
+        :class="{ active: categoryId === c.id }"
+        @click="categoryId = c.id"
+      >
+        <span class="cat-icon">{{ c.icon }}</span>
+        <span class="cat-name">{{ c.name }}</span>
       </div>
     </div>
 
-    <!-- 类型 -->
-    <div class="form-group">
-      <label class="form-label">类型</label>
-      <div class="type-selector">
-        <div
-          v-for="t in types"
-          :key="t.key"
-          class="type-btn"
-          :class="{ active: activeType === t.key }"
-          @click="onType(t.key)"
-        >{{ t.label }}</div>
+    <!-- 金额 · 日期：同一张卡，金额不再单独放大，与日期视觉权重一致 -->
+    <div class="amount-note-card">
+      <div class="an-main">
+        <span class="an-label">金额</span>
+        <div class="an-amount">
+          <span class="amount-symbol">¥</span>
+          <input v-model="amount" type="number" class="amount-input" placeholder="0.00" />
+        </div>
+        <span class="an-sep"></span>
+        <span class="an-date" @click="openDatePanel">📅 {{ shortDate }}</span>
       </div>
     </div>
 
-    <!-- 日期 -->
-    <div class="form-group">
-      <label class="form-label">日期</label>
-      <div class="date-picker-row" @click="openDatePanel">
-        <span>📅 {{ dateLabel }}</span>
-        <span class="date-arrow" :class="{ on: showDatePanel }">›</span>
+    <!-- 备注：独立一栏，与金额卡拉开间距，下面挂该分类的历史记录 -->
+    <div class="form-group note-group">
+      <label class="form-label">备注</label>
+      <input v-model="merchant" class="form-input" placeholder="添加备注..." />
+      <div v-if="merchantHistory.length" class="history-row">
+        <span
+          v-for="h in merchantHistory"
+          :key="h"
+          class="history-chip"
+          :class="{ on: merchant === h }"
+          @click="merchant = h"
+        >{{ h }}</span>
       </div>
+    </div>
 
-      <!-- 日历与表单同宽：原生面板宽度由浏览器控制，改不了，故自绘 -->
-      <div v-if="showDatePanel" class="date-panel">
+    <!-- 日历与表单同宽：原生面板宽度由浏览器控制，改不了，故自绘 -->
+    <div v-if="showDatePanel" class="date-panel">
         <div class="dp-head">
           <span class="dp-nav" @click="shiftMonth(-1)">‹</span>
           <span class="dp-title">{{ viewTitle }}</span>
@@ -297,75 +391,42 @@ onMounted(() => {
           <span class="dp-btn primary" @click="pickToday">回到今天</span>
         </div>
       </div>
-    </div>
 
-    <!-- 分类 -->
-    <div class="form-group">
-      <div class="form-label-row">
-        <label class="form-label">分类</label>
-        <span class="add-cat-btn" @click="openAddCat">＋ 新增</span>
+    <!-- 账本：只展示家庭里真实建过的账本，默认选中当前身份所属的那本 -->
+    <div class="quick-bar">
+      <div
+        v-for="b in existingBooks"
+        :key="b"
+        class="q-chip"
+        :class="{ on: bookType === b }"
+        @click="onBook(b)"
+      >
+        📒 {{ bookName(b) }}<span v-if="b === myBook" class="q-tag">我的</span>
       </div>
-      <div class="category-grid">
-        <div
-          v-for="c in categories"
-          :key="c.id"
-          class="category-chip"
-          :class="{ active: categoryId === c.id }"
-          @click="categoryId = c.id"
-        >
-          <span class="icon">{{ c.icon }}</span>
-          {{ c.name }}
-        </div>
+      <div class="q-chip" :class="{ on: isPrivate }" @click="isPrivate = !isPrivate">
+        🙈 {{ isPrivate ? '不计入共同支出' : '计入共同支出' }}
       </div>
     </div>
 
-    <!-- 备注 -->
-    <div class="form-group">
-      <label class="form-label">备注 支持语音</label>
-      <div class="note-row">
-        <input v-model="merchant" class="form-input" placeholder="添加备注..." />
-        <button
-          type="button"
-          class="voice-btn-sm"
-          :class="{ on: listening }"
-          :title="speechOK ? '语音输入备注' : '当前浏览器不支持语音输入'"
-          @click="startVoice()"
-        >{{ listening ? '■' : '🎤' }}</button>
+    <!-- 账户：横向 chips，选中高亮 -->
+    <div class="account-bar">
+      <div
+        v-for="a in visibleAccounts"
+        :key="a.id"
+        class="q-chip acct"
+        :class="{ on: accountId === a.id }"
+        @click="accountId = a.id"
+      >
+        {{ a.icon }} {{ a.name }}
       </div>
-    </div>
-
-    <!-- 账户 -->
-    <div class="form-group">
-      <label class="form-label">账户 智能推荐</label>
-      <div class="quick-account">
-        <div
-          v-for="a in accounts"
-          :key="a.id"
-          class="quick-account-btn"
-          :class="{ active: accountId === a.id, recommended: accountId === a.id }"
-          @click="accountId = a.id"
-        >
-          <span class="icon">{{ a.icon }}</span>{{ a.name }}
-        </div>
-        <div v-if="!accounts.length" class="quick-account-btn">💳 未设置账户</div>
-      </div>
-    </div>
-
-
-    <!-- 私密消费 -->
-    <div class="form-group">
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">私密消费</div>
-          <div class="toggle-sub">不计入共同支出</div>
-        </div>
-        <div class="toggle" :class="{ active: isPrivate }" @click="isPrivate = !isPrivate"></div>
-      </div>
+      <div v-if="!visibleAccounts.length" class="q-chip">💳 这本账下还没有账户</div>
     </div>
 
     <!-- 按钮 -->
     <div class="form-actions">
-      <button class="btn btn-primary btn-full" :disabled="saving" @click="onSave">保存</button>
+      <button class="btn btn-primary btn-full" :disabled="saving" @click="onSave">
+        {{ isEdit ? '保存修改' : '保存' }}
+      </button>
       <button class="btn btn-secondary btn-full" @click="router.push('/')">取消</button>
     </div>
 
@@ -434,68 +495,149 @@ onMounted(() => {
   color: #7f77dd;
   cursor: pointer;
 }
-.amount-row {
-  display: flex;
-  align-items: center;
+/* 备注 · 日期 · 金额 同卡一行：一眼能看到记的是什么、哪天、多少 */
+.amount-note-card {
   background: #fff;
   border: 0.5px solid #d3d1c7;
-  border-radius: 8px;
-  padding: 8px 14px;
+  border-radius: 12px;
+  padding: 10px 12px;
 }
+.an-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.an-label {
+  flex: none;
+  font-size: 13px;
+  color: #5f5e5a;
+}
+/* 金额与日期同一视觉层级：都不做背景高亮，避免金额过分突出 */
+.an-sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: #e8e6dc;
+}
+/* 备注栏与金额卡之间多留一拍，避免两块白卡贴在一起 */
+.note-group {
+  margin-top: 20px;
+}
+/* 备注历史：同一分类下最近用过的备注，点一下直接填入 */
+.history-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.history-chip {
+  padding: 5px 10px;
+  border: 0.5px solid #d3d1c7;
+  border-radius: 999px;
+  background: #faf9f5;
+  font-size: 12px;
+  color: #5f5e5a;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-chip.on {
+  background: #eeedfe;
+  border-color: #7f77dd;
+  color: #534ab7;
+}
+.an-date {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1efe8;
+  font-size: 12px;
+  color: #5f5e5a;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.an-amount {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* 金额不再单独放大加粗：与日期同一视觉层级，避免抢走分类区的注意力 */
 .amount-symbol {
-  font-size: 24px;
-  font-weight: 600;
-  color: #26215c;
+  font-size: 18px;
+  font-weight: 500;
+  color: #2c2c2a;
 }
 .amount-input {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
-  font-size: 24px;
-  font-weight: 600;
-  color: #26215c;
-  padding: 6px 10px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #2c2c2a;
+  padding: 6px 4px;
 }
-.type-selector {
-  display: flex;
-  gap: 8px;
-}
-.type-btn {
-  flex: 1;
-  padding: 12px;
-  border: 0.5px solid #d3d1c7;
-  border-radius: 8px;
-  background: #fff;
-  text-align: center;
-  cursor: pointer;
-  font-size: 13px;
-}
-.type-btn.active {
-  background: #eeedfe;
-  border-color: #7f77dd;
-  color: #7f77dd;
-}
-.date-picker-row {
-  position: relative;
+/* 编辑态提示条 */
+.edit-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  border: 0.5px solid #d3d1c7;
-  border-radius: 8px;
-  padding: 14px;
-  font-size: 14px;
-  color: #2c2c2a;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: #eeedfe;
+}
+.edit-tip {
+  font-size: 12px;
+  color: #534ab7;
+  font-weight: 600;
+}
+.edit-cancel {
+  font-size: 12px;
+  color: #888780;
   cursor: pointer;
 }
-.date-arrow {
-  display: inline-block;
-  color: #b4b2a9;
-  margin-left: 2px;
-  transition: transform 0.15s ease;
+/* 顶部类型条：文字胶囊，选中实色，右侧 ＋ 新增分类 */
+.type-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0 10px;
+  overflow-x: auto;
 }
-.date-arrow.on {
-  transform: rotate(90deg);
+.type-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: #5f5e5a;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.type-pill.active {
+  background: #534ab7;
+  color: #fff;
+  font-weight: 600;
+}
+.bar-spacer {
+  flex: 1;
+}
+.bar-add {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #534ab7;
+  font-size: 18px;
+  cursor: pointer;
+  background: #eeedfe;
 }
 /* 自绘日历：宽度跟随表单，与上方输入框完全对齐 */
 .date-panel {
@@ -584,55 +726,43 @@ onMounted(() => {
   color: #534ab7;
   font-weight: 600;
 }
+/* 分类宫格：5 列大图标，选中浅紫底 */
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  padding-bottom: 4px;
 }
-.category-chip {
-  padding: 10px 8px;
-  border: 0.5px solid #e8e8e8;
-  border-radius: 8px;
-  text-align: center;
-  cursor: pointer;
-  font-size: 11px;
+.category-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 2px 8px;
   background: #fff;
+  border: 0.5px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
 }
-.category-chip.active {
-  background: #7f77dd;
-  color: #fff;
+.cat-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+.cat-name {
+  font-size: 11px;
+  color: #2c2c2a;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.category-cell.active {
+  background: #eeedfe;
   border-color: #7f77dd;
 }
-.category-chip .icon {
-  font-size: 18px;
-  display: block;
-  margin-bottom: 4px;
-}
-.note-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.note-row .form-input {
-  flex: 1;
-}
-/* ★ 原类名写成 .note-btn-sm，与模板里的 voice-btn-sm 对不上，
-   导致备注旁的语音键一直没有样式（白底灰边），顺手修正 */
-.voice-btn-sm {
-  border: none;
-  background: #eeedfe;
-  color: #7f77dd;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  flex: none;
-  font-size: 18px;
-  cursor: pointer;
-}
-/* 录音中：变红 + 图标换成 ■，让用户知道「真的在听」 */
-.voice-btn-sm.on {
-  background: #fde8e8;
-  color: #d34b4b;
+.category-cell.active .cat-name {
+  color: #534ab7;
+  font-weight: 600;
 }
 /* ---------------- 新增分类弹层 */
 .sheet-mask {
@@ -702,78 +832,38 @@ onMounted(() => {
   font-size: 14px;
   background: #fafbfc;
 }
-.quick-account {
+/* 快捷条与账户条：白色小 chips，横向滚动，选中浅紫 */
+.quick-bar,
+.account-bar {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  padding: 2px 0;
 }
-.quick-account-btn {
-  padding: 8px 12px;
-  border: 0.5px solid #d3d1c7;
-  border-radius: 20px;
-  background: #fff;
-  font-size: 12px;
-  cursor: pointer;
-  display: flex;
+.q-chip {
+  flex: none;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-}
-.quick-account-btn.active {
-  background: #7f77dd;
-  color: #fff;
-  border-color: #7f77dd;
-}
-/* ★ 智能推荐 = 默认选中，二者类名同时存在：
-   用 .active.recommended 提高优先级，避免只覆盖背景而文字仍是白色导致看不清 */
-.quick-account-btn.active.recommended {
-  background: #d6f0e6;
-  color: #0b5c43;
-  border-color: #1d9e75;
-  font-weight: 500;
-}
-.toggle-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  background: #fff;
+  padding: 8px 10px;
+  border: 0.5px solid #d3d1c7;
   border-radius: 8px;
-  padding: 14px;
-}
-.toggle-label {
-  font-size: 14px;
-  font-weight: 500;
-}
-.toggle-sub {
-  font-size: 12px;
-  color: #888780;
-  margin-top: 2px;
-}
-.toggle {
-  width: 44px;
-  height: 24px;
-  background: #d3d1c7;
-  border-radius: 12px;
-  cursor: pointer;
-  position: relative;
-  transition: background 0.2s;
-}
-.toggle.active {
-  background: #1d9e75;
-}
-.toggle::after {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
   background: #fff;
-  border-radius: 50%;
-  top: 2px;
-  left: 2px;
-  transition: left 0.2s;
+  font-size: 12px;
+  color: #2c2c2a;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.toggle.active::after {
-  left: 22px;
+.q-chip.on {
+  background: #eeedfe;
+  border-color: #7f77dd;
+  color: #534ab7;
+  font-weight: 600;
+}
+.q-chip .q-tag {
+  margin-left: 2px;
+  font-size: 10px;
+  color: #1d9e75;
 }
 .form-actions {
   display: flex;

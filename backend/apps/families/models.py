@@ -26,7 +26,7 @@ class Family(models.Model):
     name = models.CharField('家庭名称', max_length=50, default='我的家庭')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
                               related_name='owned_families', verbose_name='主账号')
-    # 账本自定义名称：{'shared': '共同账户', 'husband': '老公账户'}，缺省用内置默认名
+    # 账本自定义名称：{'shared': '共同账本', 'husband': '爸爸的账'}，缺省用内置默认名
     book_labels = models.JSONField('账本名称', default=dict, blank=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
 
@@ -47,7 +47,8 @@ class FamilyMember(models.Model):
     BOOK_HUSBAND = 'husband'
     BOOK_WIFE = 'wife'
     BOOK_SHARED = 'shared'
-    BOOK_CHOICES = [(BOOK_HUSBAND, '老公账本'), (BOOK_WIFE, '老婆账本'), (BOOK_SHARED, '共同账本')]
+    # 展示层默认名保持中性：不预设成员关系，家庭可在「账本名称」里改成任意叫法
+    BOOK_CHOICES = [(BOOK_HUSBAND, '账本一'), (BOOK_WIFE, '账本二'), (BOOK_SHARED, '共同账本')]
 
     id = models.CharField(primary_key=True, max_length=36, default=_uuid, editable=False)
     family = models.ForeignKey(Family, on_delete=models.CASCADE,

@@ -13,10 +13,9 @@ const password = ref('')
 const loading = ref(false)
 const error = ref('')
 
-// 注册专用字段：确认密码、称呼、账本（注册即建家庭，本人就是主账号）
+// 注册专用字段：确认密码、称呼（注册即建家庭，本人就是主账号，账本由后端按顺位分配）
 const confirmPassword = ref('')
 const nickname = ref('')
-const bookType = ref('husband')
 
 const isRegister = computed(() => mode.value === 'register')
 
@@ -69,7 +68,6 @@ async function onRegister() {
       phone: phone.value,
       password: password.value,
       nickname: nickname.value.trim(),
-      book_type: bookType.value,
     })
     goHome()
   } catch (e) {
@@ -89,7 +87,7 @@ function onSubmit() {
     <div class="brand">
       <div class="brand-icon">💰</div>
       <div class="brand-name">家庭财务通</div>
-      <div class="brand-sub">夫妻共同记账 · 平衡透明与隐私</div>
+      <div class="brand-sub">一起记账 · 平衡透明与隐私</div>
     </div>
     <div class="form card">
       <div class="tabs">
@@ -122,21 +120,7 @@ function onSubmit() {
         </div>
         <div class="field">
           <label>称呼<span class="opt">选填</span></label>
-          <input v-model="nickname" maxlength="20" placeholder="对方看到的称呼，如：老婆" />
-        </div>
-        <div class="field">
-          <label>我的账本</label>
-          <div class="book-pick">
-            <span
-              class="bchip"
-              :class="{ on: bookType === 'husband' }"
-              @click="bookType = 'husband'"
-              >老公账本</span
-            >
-            <span class="bchip" :class="{ on: bookType === 'wife' }" @click="bookType = 'wife'"
-              >老婆账本</span
-            >
-          </div>
+          <input v-model="nickname" maxlength="20" placeholder="家人看到的称呼，如：小林" />
         </div>
       </template>
 
@@ -253,26 +237,5 @@ function onSubmit() {
   color: var(--text-muted);
   margin-left: 6px;
 }
-/* 账本二选一 */
-.book-pick {
-  display: flex;
-  gap: 10px;
-}
-.bchip {
-  flex: 1;
-  text-align: center;
-  font-size: 13px;
-  padding: 10px 0;
-  border-radius: var(--radius-btn);
-  border: 1px solid var(--border);
-  background: #fdfdfb;
-  color: var(--text-sub);
-  cursor: pointer;
-}
-.bchip.on {
-  background: #eeedfe;
-  border-color: #7f77dd;
-  color: #534ab7;
-  font-weight: 600;
-}
+
 </style>

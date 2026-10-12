@@ -11,8 +11,8 @@ const router = useRouter()
 const RECV_COLOR = '#1D9E75'
 
 const BOOK_META = {
-  husband: { label: '老公账户', icon: '😊', color: '#1D9E75' },
-  wife: { label: '老婆账户', icon: '😍', color: '#E24B4A' },
+  husband: { label: '账本一', icon: '🧾', color: '#1D9E75' },
+  wife: { label: '账本二', icon: '🧾', color: '#E24B4A' },
   shared: { label: '共同账户', icon: '👥', color: '#7F77DD' },
 }
 
@@ -52,6 +52,13 @@ function pctOf(cents) {
 function goLoans() {
   emit('close')
   router.push('/loans')
+}
+
+// 账本分组的收益小计：只算纳入收益管理的账户
+function groupProfit(g) {
+  return (g.accounts || [])
+    .filter((a) => a.is_invest)
+    .reduce((sum, a) => sum + Number(a.profit_cents || 0), 0)
 }
 
 const validPoints = computed(() =>
@@ -253,13 +260,35 @@ onBeforeUnmount(() => {
         <div v-for="g in data.groups" :key="g.book_type" class="group-card">
           <div class="group-head">
             <span>{{ metaOf(g.book_type).icon }} {{ metaOf(g.book_type).label }}</span>
-            <span class="group-total">{{ money(g.total_cents) }}</span>
+            <span class="group-total">
+              {{ money(g.total_cents) }}
+              <em
+                v-if="groupProfit(g)"
+                class="g-profit"
+                :class="groupProfit(g) > 0 ? 'p-up' : 'p-down'"
+              >{{ groupProfit(g) > 0 ? '+' : '-' }}¥{{ money(Math.abs(groupProfit(g)) / 100) }}</em>
+            </span>
           </div>
-          <div v-for="a in g.accounts" :key="a.id" class="acc-row">
-            <span class="acc-icon">{{ a.icon }}</span>
-            <span class="acc-name">{{ a.name }}</span>
-            <span class="acc-balance">{{ money(a.balance_cents) }}</span>
-          </div>
+          <template v-for="a in g.accounts" :key="a.id">
+            <div class="acc-row">
+              <span class="acc-icon">{{ a.icon }}</span>
+              <span class="acc-name">
+                {{ a.name }}
+                <i v-if="a.is_invest" class="acc-tag">收</i>
+              </span>
+              <span class="acc-balance">{{ money(a.balance_cents) }}</span>
+            </div>
+            <!-- 纳入收益管理的账户：余额下面直接标出「其中收益」占多少 -->
+            <div v-if="a.is_invest && Number(a.profit_cents)" class="acc-profit-line">
+              其中收益
+              <em :class="a.profit_cents > 0 ? 'p-up' : 'p-down'">
+                {{ a.profit_cents > 0 ? '+' : '-' }}¥{{ money(Math.abs(a.profit_cents) / 100) }}
+              </em>
+              <template v-if="Number(a.balance_cents)">
+                ，占该账户 {{ ((a.profit_cents / a.balance_cents) * 100).toFixed(1) }}%
+              </template>
+            </div>
+          </template>
           <div v-if="!g.accounts.length" class="acc-empty">暂无{{ metaOf(g.book_type).label }}</div>
         </div>
 
@@ -507,6 +536,40 @@ onBeforeUnmount(() => {
 }
 .group-total {
   font-variant-numeric: tabular-nums;
+}
+/* 账本收益小计 & 账户收益明细 */
+.g-profit,
+.p-up,
+.p-down {
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.g-profit {
+  font-size: 11px;
+  margin-left: 6px;
+}
+.p-up {
+  color: #1d9e75;
+}
+.p-down {
+  color: #d03b3b;
+}
+.acc-tag {
+  font-style: normal;
+  font-size: 9px;
+  color: #534ab7;
+  background: #eeedfe;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
+.acc-profit-line {
+  padding: 0 14px 10px 46px;
+  margin-top: -4px;
+  font-size: 11px;
+  color: #888780;
 }
 .acc-row {
   display: flex;

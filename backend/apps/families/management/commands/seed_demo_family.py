@@ -22,7 +22,7 @@ class Command(BaseCommand):
         family = Family.objects.filter(owner=owner).first()
         spouse, created = User.objects.get_or_create(
             username='13800138001',
-            defaults={'phone': '13800138001', 'nickname': '老婆'},
+            defaults={'phone': '13800138001', 'nickname': '成员二'},
         )
         if created:
             spouse.set_password('test123456')
@@ -33,7 +33,7 @@ class Command(BaseCommand):
             user=spouse,
             defaults={
                 'role': FamilyMember.ROLE_MEMBER,
-                'nickname': '老婆',
+                'nickname': '成员二',
                 'book_type': FamilyMember.BOOK_WIFE,
                 'permissions': dict(DEFAULT_PERMISSIONS),
             },

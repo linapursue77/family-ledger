@@ -17,11 +17,12 @@ const CARD_OPTIONS = [
   { value: 'credit', label: '信用卡', icon: '💳' },
   { value: 'cash', label: '现金', icon: '💵' },
   { value: 'wallet', label: '数字钱包', icon: '📱' },
+  { value: 'invest', label: '投资理财', icon: '📈' },
 ]
 const BOOK_OPTIONS = [
   { value: 'shared', label: '共同', icon: '👨‍👩‍👧' },
-  { value: 'husband', label: '老公', icon: '🧑' },
-  { value: 'wife', label: '老婆', icon: '👩' },
+  { value: 'husband', label: '账本一', icon: '🧑' },
+  { value: 'wife', label: '账本二', icon: '👤' },
 ]
 
 const name = ref('')
@@ -29,6 +30,9 @@ const cardType = ref('debit')
 const bookType = ref('shared')
 const visibility = ref('shared')
 const balance = ref('')
+// 收益管理：勾选后可录入「收益总额」，本金 = 当前金额 − 收益
+const isInvest = ref(false)
+const profitInput = ref('')
 const saving = ref(false)
 let originalCardType = 'debit'
 
@@ -67,8 +71,19 @@ watch(
     bookType.value = a?.book_type || props.defaultBook || 'shared'
     visibility.value = a?.visibility || 'shared'
     balance.value = a ? String((Number(a.balance_cents) || 0) / 100) : ''
+    isInvest.value = !!a?.is_invest
+    // 回填收益：收益 = 本金 − 现值（本金未录过则为 0）
+    profitInput.value =
+      a && a.is_invest && Number(a.principal_cents) > 0
+        ? String((Number(a.principal_cents) - Number(a.balance_cents)) / 100)
+        : ''
   }
 )
+
+// 介质选「投资理财」默认纳入收益管理，少一步操作
+watch(cardType, (v) => {
+  if (v === 'invest') isInvest.value = true
+})
 
 function cardIcon(value) {
   return CARD_OPTIONS.find((c) => c.value === value)?.icon || '💰'
@@ -84,6 +99,17 @@ async function onSave() {
       type: visibility.value === 'self' ? 'private' : 'personal',
       card_type: cardType.value,
       book_type: bookType.value,
+      is_invest: isInvest.value,
+    }
+    // 用户填的是「收益总额」，后端存的是本金：本金 = 当前金额 − 收益。
+    // 收益留空时本金 = 当前金额，收益从 0 开始。
+    if (isInvest.value) {
+      const bal = Number(balance.value || 0)
+      const pf = profitInput.value === '' ? 0 : Number(profitInput.value)
+      if (!Number.isFinite(pf)) return toast('收益金额不正确')
+      const principalVal = bal - pf
+      if (principalVal < 0) return toast('收益不能大于当前金额')
+      base.principal = principalVal.toFixed(2)
     }
     if (isEdit.value) {
       const payload = { ...base }
@@ -102,8 +128,10 @@ async function onSave() {
     } else {
       await accountApi.create({ ...base, icon, balance: Number(balance.value || 0).toFixed(2) })
     }
-    emit('saved')
+    // 保存成功：先关弹窗再通知刷新，避免父组件刷新时把弹窗又带出来
     emit('close')
+    toast('已保存')
+    emit('saved')
   } catch (e) {
     toast(e.message || '保存失败')
   } finally {
@@ -120,6 +148,21 @@ async function onDelete() {
   if (!ok) return
   saving.value = true
   try {
+    // 余额不为 0 时后端会拒绝删除；这里代劳「先清零」，
+    // 走 adjust 留调整日志，资金去向可追溯
+    const bal = Number(balance.value || 0)
+    if (Math.abs(bal) > 0.001) {
+      const ok2 = await ask({
+        title: '账户余额不为 0',
+        lines: [`当前余额 ¥${bal.toFixed(2)}`, '删除前会自动把余额清零并记录调整日志'],
+        okText: '清零并删除',
+      })
+      if (!ok2) return
+      await accountApi.adjust(props.account.id, {
+        balance: '0',
+        reason: '删除账户前清零余额',
+      })
+    }
     await accountApi.remove(props.account.id)
     emit('saved')
     emit('close')
@@ -197,8 +240,31 @@ async function onDelete() {
           </div>
         </div>
 
+        <!-- 收益管理：勾选后该账户按「现值 − 本金」计入收益统计 -->
         <div class="fld">
-          <label class="fld-label">当前余额</label>
+          <label class="fld-label">收益管理</label>
+          <div class="sw-row" @click="isInvest = !isInvest">
+            <div class="sw-main">
+              <div class="sw-title">纳入收益管理</div>
+              <div class="sw-sub">股票 / 基金 / 理财账户勾选后统计收益</div>
+            </div>
+            <span class="sw" :class="{ on: isInvest }"><i></i></span>
+          </div>
+        </div>
+
+        <div v-if="isInvest" class="fld">
+          <label class="fld-label">收益总额</label>
+          <div class="money-input">
+            <span class="money-sign">¥</span>
+            <input v-model="profitInput" type="number" inputmode="decimal" placeholder="0.00" />
+          </div>
+          <div class="fld-tip">
+            目前累计赚的钱（亏损填负数）；投入本金 = 当前金额 − 收益
+          </div>
+        </div>
+
+        <div class="fld">
+          <label class="fld-label">当前金额{{ isInvest ? '（含收益）' : '' }}</label>
           <div class="money-input">
             <span class="money-sign">¥</span>
             <input v-model="balance" type="number" inputmode="decimal" placeholder="0.00" />
@@ -303,8 +369,59 @@ async function onDelete() {
   min-width: 0;
 }
 .chip-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+}
+/* 收益管理开关 */
+.sw-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0.5px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.sw-title {
+  font-size: 14px;
+  color: #26215c;
+}
+.sw-sub {
+  font-size: 11px;
+  color: #b8b6ae;
+  margin-top: 2px;
+}
+.sw {
+  flex: none;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #d3d1c7;
+  position: relative;
+  transition: background 0.2s;
+}
+.sw i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+.sw.on {
+  background: #1d9e75;
+}
+.sw.on i {
+  transform: translateX(18px);
+}
+.fld-tip {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #b8b6ae;
+  line-height: 1.5;
 }
 .chip {
   flex: 1;

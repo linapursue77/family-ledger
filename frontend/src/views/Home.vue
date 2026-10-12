@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ledgerApi, accountApi } from '@/api'
 import { yuan } from '@/utils/money'
+import { toast } from '@/utils/toast'
 import AssetDetailSheet from '@/components/AssetDetailSheet.vue'
 import TxDetailSheet from '@/components/TxDetailSheet.vue'
 
@@ -47,6 +48,8 @@ async function load() {
   } finally {
     loading.value = false
   }
+  // 收益不随时间范围变，只在进首页时拉一次（fire-and-forget，不阻塞首屏）
+  if (!retOv.value) loadReturns()
 }
 function onPreset(p) {
   active.value = p
@@ -176,6 +179,16 @@ function assetChangeText() {
   const sign = v >= 0 ? '+' : ''
   return `比上月 ${sign}¥${yuan(Math.abs(v)).toFixed(2)}`
 }
+
+// —— 资产卡上的收益展示：从收益管理接口取 ——
+const retOv = ref(null)
+async function loadReturns() {
+  try {
+    retOv.value = await accountApi.returns()
+  } catch (e) {
+    retOv.value = null
+  }
+}
 // —— 账单明细弹窗 ——
 const showDetail = ref(false)
 const detailTx = ref(null)
@@ -204,6 +217,95 @@ function openDetail(t) {
   if (!t) return
   detailTx.value = decorateTx(t)
   showDetail.value = true
+}
+/** 点账单条目 → 进记账页改这一笔（借贷流水由借钱来往维护，只能在那里改） */
+function onBillTap(t) {
+  if (!t) return
+  // 滑动手势结束时会补发一次 click，这里把它吃掉，避免滑完就跳进编辑页
+  if (suppressClick) {
+    suppressClick = false
+    return
+  }
+  // 已滑开的条目再点一下 = 收起，不要误进编辑
+  if (swipeId.value === t.id && offset.value < 0) {
+    resetSwipe()
+    return
+  }
+  if (t.isLoan) return openDetail(t)
+  router.push({ path: '/add', query: { id: t.id } })
+}
+
+// ---------------- 左滑删除
+// ★ 用 Pointer Events 而不是 touch 事件：这样电脑鼠标拖拽和手机手指滑动都能用，
+//   只监听 touch 的话在桌面浏览器上完全没反应。
+const SWIPE_W = 76 // 删除按钮宽度
+const swipeId = ref('') // 当前处于滑开状态的条目
+const offset = ref(0) // 当前条目滑动的像素偏移（负值）
+let startX = 0
+let startY = 0
+let dragging = false
+let axisLocked = false // true=已判定为横向滑动，避免与页面纵向滚动打架
+let suppressClick = false // 本次手势发生过滑动 → 随后的 click 不要当成点击条目
+function resetSwipe() {
+  swipeId.value = ''
+  offset.value = 0
+}
+function onPointerDown(t, e) {
+  if (t.isLoan) return // 借贷流水删不了，也就不给滑
+  startX = e.clientX
+  startY = e.clientY
+  axisLocked = false
+  suppressClick = false
+  // ★ 按下时不立刻展开：先等方向判定，否则竖向滚动会误触发
+  dragging = true
+  swipeId.value = t.id
+  offset.value = 0
+  try {
+    e.target.setPointerCapture?.(e.pointerId)
+  } catch {
+    /* 捕获失败不影响主流程 */
+  }
+}
+function onPointerMove(t, e) {
+  if (!dragging) return
+  const dx = e.clientX - startX
+  const dy = e.clientY - startY
+  if (!axisLocked) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+    // 竖向意图明显 → 放弃本次滑动，交给页面滚动
+    if (Math.abs(dy) > Math.abs(dx)) {
+      dragging = false
+      resetSwipe()
+      return
+    }
+    axisLocked = true
+    suppressClick = true
+  }
+  // 只允许左滑；最多滑出删除按钮宽度
+  offset.value = Math.max(-SWIPE_W, Math.min(0, dx))
+}
+function onPointerEnd() {
+  if (!dragging) return
+  dragging = false
+  // 过半则吸附展开，否则回弹收起
+  offset.value = offset.value <= -SWIPE_W / 2 ? -SWIPE_W : 0
+  if (offset.value === 0) swipeId.value = ''
+}
+const swiping = ref(false)
+async function onDelete(t) {
+  if (!t || swiping.value) return
+  swiping.value = true
+  try {
+    await ledgerApi.removeTx(t.id)
+    resetSwipe()
+    recentTxs.value = recentTxs.value.filter((x) => x.id !== t.id)
+    await load() // 余额/统计都变了，直接整体刷新
+    toast('已删除')
+  } catch (e) {
+    toast(e.message || '删除失败')
+  } finally {
+    swiping.value = false
+  }
 }
 // 记账后回首页：只显示一条轻提示，不自动弹窗
 function consumeNotice() {
@@ -254,6 +356,15 @@ onMounted(async () => {
         <div class="label">🏦 家庭净资产</div>
         <div class="amount">¥{{ ov.total_assets }}</div>
         <div class="change">{{ assetChangeText() }} › 点击查看净值曲线</div>
+        <!-- 收益单独拎出来；账本维度在资产明细弹窗里看 -->
+        <div v-if="retOv && retOv.has_invest" class="invest-line" @click.stop="router.push('/returns')">
+          <span class="invest-label">其中收益</span>
+          <em :class="Number(retOv.profit_cents) >= 0 ? 'profit-up' : 'profit-down'">
+            {{ Number(retOv.profit_cents) >= 0 ? '+' : '-' }}¥{{
+              money(Math.abs(Number(retOv.profit_cents)) / 100)
+            }}</em>
+          <span class="invest-dim">投资总金额 ¥{{ money(Number(retOv.value_cents) / 100) }} ›</span>
+        </div>
       </div>
 
       <!-- 本期收支：资产卡是「存量」，这里补上所选周期内的「流量」口径 -->
@@ -328,19 +439,36 @@ onMounted(async () => {
                 <b v-if="g.income" class="text-income">收:{{ amt(g.income) }}</b>
               </span>
             </div>
-            <div v-for="t in g.items" :key="t.id" class="bill-item" @click="openDetail(t)">
-              <span class="bill-ic" :style="{ background: t.catColor + '22', color: t.catColor }">{{ t.catIcon }}</span>
-              <div class="bill-info">
-                <div class="bill-merchant">{{ t.merchant }}</div>
-                <div v-if="t.accountName" class="bill-account">{{ t.accountName }}</div>
-              </div>
-              <span
-                :class="[
-                  'bill-amount',
-                  t.isLoan ? 'text-loan' : t.isIn ? 'text-income' : 'text-expense',
-                ]"
-                >{{ t.amountText }}</span
+            <!-- 条目：点击进编辑，左滑露出删除 -->
+            <div v-for="t in g.items" :key="t.id" class="bill-swipe">
+              <div
+                class="bill-del"
+                :class="{ disabled: !!t.isLoan }"
+                @click="onDelete(t)"
+              >{{ t.isLoan ? '借贷' : '删除' }}</div>
+              <div
+                class="bill-item"
+                :class="{ swiping: swipeId === t.id }"
+                :style="swipeId === t.id ? { transform: `translateX(${offset}px)` } : null"
+                @click="onBillTap(t)"
+                @pointerdown="onPointerDown(t, $event)"
+                @pointermove="onPointerMove(t, $event)"
+                @pointerup="onPointerEnd"
+                @pointercancel="onPointerEnd"
               >
+                <span class="bill-ic" :style="{ background: t.catColor + '22', color: t.catColor }">{{ t.catIcon }}</span>
+                <div class="bill-info">
+                  <div class="bill-merchant">{{ t.merchant }}</div>
+                  <div v-if="t.accountName" class="bill-account">{{ t.accountName }}</div>
+                </div>
+                <span
+                  :class="[
+                    'bill-amount',
+                    t.isLoan ? 'text-loan' : t.isIn ? 'text-income' : 'text-expense',
+                  ]"
+                  >{{ t.amountText }}</span
+                >
+              </div>
             </div>
           </div>
         </div>
@@ -473,6 +601,54 @@ onMounted(async () => {
 .asset-card .change {
   font-size: 12px;
   opacity: 0.9;
+}
+/* 资产卡内的收益展示 */
+.invest-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+}
+.invest-label {
+  opacity: 0.85;
+}
+.invest-line em,
+.invest-chip em {
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.profit-up {
+  color: #a8f0cf;
+}
+.profit-down {
+  color: #ffc4c4;
+}
+.invest-dim {
+  margin-left: auto;
+  opacity: 0.75;
+  font-size: 11px;
+}
+.invest-books {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.invest-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+}
+.invest-chip em {
+  font-weight: 600;
 }
 .card {
   background: #fff;
@@ -703,13 +879,45 @@ onMounted(async () => {
   font-weight: 500;
   color: #888780;
 }
+/* 滑动容器：删除按钮铺在底层，条目覆盖其上，左滑即露出 */
+.bill-swipe {
+  position: relative;
+  overflow: hidden;
+}
+.bill-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e24b4a;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+/* 借贷流水的余额由借钱来往维护，这里不允许删除 */
+.bill-del.disabled {
+  background: #c9c7bf;
+}
 .bill-item {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 2px;
   border-bottom: 0.5px solid #f7f6f3;
+  background: #fff;
   cursor: pointer;
+  /* 纵向滚动交给浏览器，横向手势留给左滑删除（移动端不这么设会收不到 pointermove） */
+  touch-action: pan-y;
+}
+/* 手指按住时不加过渡（跟手），松手后回弹/吸附才有动画 */
+.bill-item.swiping {
+  transition: transform 0.18s ease;
 }
 .bill-item:active {
   background: #f7f6f3;

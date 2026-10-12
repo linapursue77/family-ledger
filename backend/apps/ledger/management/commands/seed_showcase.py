@@ -6,7 +6,7 @@
     python manage.py seed_showcase --reset    # 清空重建
 
 产出：
-    · 夫妻两个账号 + 一个家庭（含账本别名与协商阈值）
+    · 两个成员账号 + 一个家庭（账本名自定义、含协商阈值）
     · 7 个账户（储蓄卡 / 信用卡 / 现金 / 钱包，三类账本齐全）
     · 近 6 个月、约 200 笔流水（工资、房租、餐饮、出行…含私密消费）
     · 3 笔借钱来往（未还 / 部分还 / 已还清各一）
@@ -35,6 +35,9 @@ MONTHS = 6
 OWNER_PHONE = '13800138000'
 SPOUSE_PHONE = '13800138001'
 PASSWORD = 'test123456'
+OWNER_NICK = '小林'          # 演示用中性称呼，不预设成员关系
+SPOUSE_NICK = '小陈'
+FAMILY_NAME = '示例家庭'
 
 # 账户：(名称, 图标, 归属, 账本, 介质, 银行, 是否计总资产, 期初余额元)
 ACCOUNTS = [
@@ -60,8 +63,8 @@ EXPENSE_TEMPLATE = [
     ('digital', ['Apple Store', '小米之家', '华为旗舰店'], 1, (200, 1200), 'owner', 5, False),
     ('beauty', ['屈臣氏', '丝芙兰'], 1, (120, 780), 'spouse', 4, False),
     ('gift', ['礼物', '红包'], 1, (200, 1200), 'owner', 2, False),
-    ('clothing', ['淘宝', '京东'], 2, (60, 350), 'owner', 1, True),       # 老公私密消费
-    ('beauty', ['小红书', '美容院'], 1, (200, 900), 'spouse', 4, True),    # 老婆私密消费
+    ('clothing', ['淘宝', '京东'], 2, (60, 350), 'owner', 1, True),       # 成员一私密消费
+    ('beauty', ['小红书', '美容院'], 1, (200, 900), 'spouse', 4, True),    # 成员二私密消费
 ]
 
 INCOME_TEMPLATE = [
@@ -107,38 +110,47 @@ class Command(BaseCommand):
     def _ensure_family(self):
         owner, _ = User.objects.get_or_create(
             username=OWNER_PHONE,
-            defaults={'phone': OWNER_PHONE, 'nickname': '老公'},
+            defaults={'phone': OWNER_PHONE, 'nickname': OWNER_NICK},
         )
         owner.set_password(PASSWORD)
-        owner.nickname = '老公'
+        owner.nickname = OWNER_NICK
         owner.privacy_limit_cents = 80000          # 隐私额度 ¥800，配合私密消费演示
         owner.save(update_fields=['password', 'nickname', 'privacy_limit_cents'])
 
         spouse, _ = User.objects.get_or_create(
             username=SPOUSE_PHONE,
-            defaults={'phone': SPOUSE_PHONE, 'nickname': '老婆'},
+            defaults={'phone': SPOUSE_PHONE, 'nickname': SPOUSE_NICK},
         )
         spouse.set_password(PASSWORD)
-        spouse.nickname = '老婆'
+        spouse.nickname = SPOUSE_NICK
         spouse.privacy_limit_cents = 80000
         spouse.save(update_fields=['password', 'nickname', 'privacy_limit_cents'])
 
         family = Family.objects.filter(owner=owner).first()
         if family is None:
-            family = Family.objects.create(owner=owner, name='陈先生的家')
+            family = Family.objects.create(owner=owner, name=FAMILY_NAME)
         if family.name in ('我的家庭', ''):
-            family.name = '陈先生的家'
-        family.book_labels = {'shared': '共同账户', 'husband': '老公账户', 'wife': '老婆账户'}
+            family.name = FAMILY_NAME
+        # 演示「账本名由家庭自己命名」：默认名只是中性占位
+        family.book_labels = {'shared': '共同账本', 'husband': f'{OWNER_NICK}的账',
+                              'wife': f'{SPOUSE_NICK}的账'}
         family.save(update_fields=['name', 'book_labels'])
-        FamilyMember.objects.get_or_create(family=family, user=owner,
-                                           defaults={'role': FamilyMember.ROLE_OWNER,
-                                                     'nickname': '老公',
-                                                     'book_type': FamilyMember.BOOK_HUSBAND})
-        FamilyMember.objects.get_or_create(family=family, user=spouse,
-                                           defaults={'role': FamilyMember.ROLE_MEMBER,
-                                                     'nickname': '老婆',
-                                                     'book_type': FamilyMember.BOOK_WIFE,
-                                                     'permissions': dict(DEFAULT_PERMISSIONS)})
+        owner_member, _ = FamilyMember.objects.get_or_create(
+            family=family, user=owner,
+            defaults={'role': FamilyMember.ROLE_OWNER,
+                      'nickname': OWNER_NICK,
+                      'book_type': FamilyMember.BOOK_HUSBAND})
+        spouse_member, _ = FamilyMember.objects.get_or_create(
+            family=family, user=spouse,
+            defaults={'role': FamilyMember.ROLE_MEMBER,
+                      'nickname': SPOUSE_NICK,
+                      'book_type': FamilyMember.BOOK_WIFE,
+                      'permissions': dict(DEFAULT_PERMISSIONS)})
+        # get_or_create 不会更新已有记录，昵称改名后要显式同步（权限保持不动）
+        for member, nick in ((owner_member, OWNER_NICK), (spouse_member, SPOUSE_NICK)):
+            if member.nickname != nick:
+                member.nickname = nick
+                member.save(update_fields=['nickname'])
         Threshold.objects.get_or_create(family=family, defaults={
             'small_limit_cents': 80000, 'notify_limit_cents': 300000, 'approve_limit_cents': 800000})
         return owner, spouse, family
@@ -311,7 +323,8 @@ class Command(BaseCommand):
         loan = summarize(family)
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS('演示数据就绪'))
-        self.stdout.write(f'  登录账号：{OWNER_PHONE} / {PASSWORD}（老公）、{SPOUSE_PHONE} / {PASSWORD}（老婆）')
+        self.stdout.write(f'  登录账号：{OWNER_PHONE} / {PASSWORD}（{OWNER_NICK}）、'
+                          f'{SPOUSE_PHONE} / {PASSWORD}（{SPOUSE_NICK}）')
         self.stdout.write(f'  家庭：{family.name}')
         self.stdout.write(f'  账户：{len(accounts)} 个，总资产 ¥{total / 100:,.2f}')
         self.stdout.write(f'  流水：{tx.count()} 笔，收入 ¥{income / 100:,.2f}，支出 ¥{expense / 100:,.2f}')

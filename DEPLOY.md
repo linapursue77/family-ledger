@@ -10,7 +10,7 @@
 | 路线 | 谁能访问 | 用时 | 适合 |
 |---|---|---|---|
 | A 内网单端口 | 同一内网的设备 | 5 分钟 | 自己先跑通手感 |
-| B 内网 + 隧道 | 任何能上网的人 | 10 分钟 | 让老婆在家先真用两周 |
+| B 内网 + 隧道 | 任何能上网的人 | 10 分钟 | 让家人先真用两周 |
 | C 云服务器 compose | 固定域名，长期 | 40 分钟 | 正式使用 |
 
 ---
@@ -43,7 +43,7 @@ python manage.py runserver 0.0.0.0:8001 --noreload
 
 ## 三、路线 B：内网 + cloudflared 隧道
 
-在路线 A 跑通的基础上加一条命令，得到一个公网 HTTPS 地址，微信发给老婆即可打开。
+在路线 A 跑通的基础上加一条命令，得到一个公网 HTTPS 地址，微信发给家人即可打开。
 
 ```bash
 # 下载地址：https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
@@ -187,7 +187,7 @@ docker compose exec web python manage.py createsuperuser      # 建 admin 账号
   from apps.users.models import User
   User.objects.filter(username__in=['13800138000','13800138001']).delete()"
   ```
-  > 注意：删之前先注册好你和老婆的真实手机号账号，并把主账号转到真账号上
+  > 注意：删之前先注册好你和家人的真实手机号账号，并把主账号转到真账号上
 - [ ] **清掉测试借款**：去「借钱来往」页把 `¥50,000` 那条测试借出删掉（它会扣减关联账户余额）
 - [ ] 限制 `/django-admin`（在 `nginx.conf` 里给 `location /admin/` 加 `allow 你的IP; deny all;`，不用就注释掉 Django admin 路由）
 - [ ] `AISettings.api_key` 目前明文存库；不接 AI 就别填，填了注意别把库泄露

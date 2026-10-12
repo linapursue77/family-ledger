@@ -55,7 +55,7 @@ def main():
 
     # 1. 注册（已存在则直接登录）
     code, body = call('POST', '/auth/register/', json={
-        'phone': PHONE, 'password': PASSWORD, 'nickname': '老公', 'book_type': 'husband',
+        'phone': PHONE, 'password': PASSWORD, 'nickname': '成员一', 'book_type': 'husband',
     })
     if body.get('code') == 0:
         show('注册', code, body)

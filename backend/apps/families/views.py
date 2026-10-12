@@ -16,7 +16,7 @@ from apps.families.serializers import (
 )
 from apps.families.services import build_viewer_ctx, require_member
 
-# 一个家庭最多 5 位成员（1 主账号 + 4 子账号）：夫妻之外还能拉父母、成年子女
+# 一个家庭最多 5 位成员（1 主账号 + 4 子账号）：伴侣之外还能拉父母、成年子女、室友
 MAX_FAMILY_MEMBERS = 5
 # 新成员账本按空缺顺位分配；三个账本都用完后并入「共同账本」，靠归属人区分
 BOOK_FALLBACK = (FamilyMember.BOOK_WIFE, FamilyMember.BOOK_HUSBAND, FamilyMember.BOOK_SHARED)
@@ -195,7 +195,7 @@ class InvitationPreviewView(APIView):
 class InvitationAcceptView(APIView):
     """POST /families/invitations/accept/ {token} —— 用邀请码正式加入家庭。
 
-    账本按空缺顺位分配（新成员默认拿「老婆账本」，被占则顺位），权限取邀请里的预设值。
+    账本按空缺顺位自动分配（主账号占「账本一」，第二人拿「账本二」），权限取邀请里的预设值。
     """
     permission_classes = [IsAuthenticated]
 
@@ -282,7 +282,7 @@ class MemberDetailView(APIView):
 class TransferOwnerView(APIView):
     """POST /families/members/{id}/transfer-owner/ —— 转让主账号。
 
-    夫妻场景里真正管钱的一方应当是主账号，所以允许现任主账号把身份交给对方。
+    真正管钱的一方应当是主账号，所以允许现任主账号把身份交给其他成员。
     转让同时把「家庭归属」和「成员角色」一起改，保证 family.owner 与 role=owner 永远一致。
     """
 

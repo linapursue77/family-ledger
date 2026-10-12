@@ -7,8 +7,8 @@ const ACCOUNT_TYPES = [
   { key: 'private', label: '隐私空间' },
 ]
 const BOOK_TYPES = [
-  { key: 'husband', label: '老公账本' },
-  { key: 'wife', label: '老婆账本' },
+  { key: 'husband', label: '账本一' },
+  { key: 'wife', label: '账本二' },
   { key: 'shared', label: '共同账本' },
 ]
 

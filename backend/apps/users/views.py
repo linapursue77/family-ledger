@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.accounts.views import book_labels
 from apps.core.response import BusinessError, api_response
 from apps.families.models import Family, FamilyMember, Threshold
 from apps.users.models import User
@@ -35,6 +36,8 @@ def _me_payload(user: User) -> dict:
             'id': member.family_id,
             'name': member.family.name,
             'owner_id': member.family.owner_id,
+            # 账本自定义名：记账页等场景要按登录身份默认选中账本并展示其名称
+            'book_labels': book_labels(member.family),
         },
         'member': {
             'id': member.id,

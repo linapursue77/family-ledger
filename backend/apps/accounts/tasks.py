@@ -24,7 +24,10 @@ def snapshot_all_accounts():
         AccountSnapshot.objects.update_or_create(
             account=account,
             ym=ym,
-            defaults={'balance_cents': account.balance_cents},
+            defaults={
+                'balance_cents': account.balance_cents,
+                'principal_cents': account.principal_cents,
+            },
         )
     logger.info('账户快照 %s：%d 个账户', ym, len(accounts))
     return f'{ym}:{len(accounts)}'

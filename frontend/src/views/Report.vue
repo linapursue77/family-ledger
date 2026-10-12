@@ -54,7 +54,8 @@ const perAvg = computed(() => {
   return c ? summary.value.total / c : 0
 })
 
-const MEMBER_EMOJI = { husband: '😊', wife: '😍', shared: '👨👩👧' }
+// 成员头像用中性图标 + 配色区分，不预设身份
+const MEMBER_EMOJI = { husband: '🧑', wife: '👤', shared: '👥' }
 function memberEmoji(book) {
   return MEMBER_EMOJI[book] || '👤'
 }
@@ -522,7 +523,7 @@ onBeforeUnmount(() => {
               class="cat-filter"
               :class="{ active: catFilter === String(m.user) }"
               @click="catFilter = String(m.user)"
-            >{{ m.book_type === 'wife' ? '😍' : '😊' }} {{ m.nickname || m.username }}</span>
+            >{{ m.book_type === 'wife' ? '👤' : '🧑' }} {{ m.nickname || m.username }}</span>
           </div>
 
           <div class="cat-list">

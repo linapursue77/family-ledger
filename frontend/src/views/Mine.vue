@@ -163,6 +163,15 @@ const loanText = computed(() => {
   return parts.join(' · ')
 })
 
+// 收益管理：菜单上直接显示累计收益，没开收益管理时留空
+const retSum = ref(null)
+const retText = computed(() => {
+  const s = retSum.value
+  if (!s || !s.has_invest) return ''
+  const c = Number(s.profit_cents || 0)
+  return `${c > 0 ? '+' : c < 0 ? '-' : ''}¥${Math.round(Math.abs(c) / 100)}`
+})
+
 async function load() {
   try {
     const [me, a, o] = await Promise.all([
@@ -193,6 +202,11 @@ async function load() {
     loanSum.value = (await loanApi.list()).summary || null
   } catch (e) {
     loanSum.value = null
+  }
+  try {
+    retSum.value = await accountApi.returns()
+  } catch (e) {
+    retSum.value = null
   }
 }
 
@@ -441,6 +455,12 @@ onMounted(() => {
         <span class="menu-value">{{ loanText }}</span>
         <span class="menu-arrow">›</span>
       </div>
+      <div class="menu-item" @click="router.push('/returns')">
+        <span class="menu-icon">📈</span>
+        <span class="menu-text">收益管理</span>
+        <span class="menu-value">{{ retText || '未开启' }}</span>
+        <span class="menu-arrow">›</span>
+      </div>
     </div>
 
     <!-- 家庭管理 -->
@@ -453,7 +473,7 @@ onMounted(() => {
         <span class="menu-arrow">{{ inviteText }}</span>
       </div>
       <div class="menu-item" @click="router.push('/family')">
-        <span class="menu-icon">👨👩👧</span>
+        <span class="menu-icon">👥</span>
         <span class="menu-text">家庭成员</span>
         <span class="menu-value">{{ memberCountText }}</span>
         <span class="menu-arrow">›</span>

@@ -45,6 +45,10 @@ export const accountApi = {
   create: (payload) => unwrap(client.post('/accounts/', payload)),
   update: (id, payload) => unwrap(client.patch(`/accounts/${id}/`, payload)),
   adjust: (id, payload) => unwrap(client.post(`/accounts/${id}/adjust/`, payload)),
+  // 收益管理：总览（累计/今年收益、一年趋势、对净资产的影响），可传 { book } 只看某个账本
+  returns: (params) => unwrap(client.get('/accounts/returns/', { params })),
+  // 本金调整：set=盘点直接设为该值，add=定投加仓在现有本金上追加
+  setPrincipal: (id, payload) => unwrap(client.post(`/accounts/${id}/principal/`, payload)),
   remove: (id) => unwrap(client.delete(`/accounts/${id}/`)),
   renameBook: (payload) => unwrap(client.post('/accounts/book-label/', payload)),
 }
@@ -72,6 +76,7 @@ export const ledgerApi = {
   categories: (kind) => unwrap(client.get('/ledger/categories/', { params: { kind } })),
   createCategory: (payload) => unwrap(client.post('/ledger/categories/', payload)),
   overview: (params) => unwrap(client.get('/ledger/overview/', { params })),
+  merchantHistory: (params) => unwrap(client.get('/ledger/merchants/history/', { params })),
   report: (params) => unwrap(client.get('/ledger/report/', { params })),
   reportInsight: (params) => unwrap(client.get('/ledger/report/insight/', { params })),
   aiConfig: () => unwrap(client.get('/ledger/ai/config/')),
@@ -80,6 +85,8 @@ export const ledgerApi = {
   transactions: (params) => unwrap(client.get('/ledger/transactions/', { params })),
   txDetail: (id) => unwrap(client.get(`/ledger/transactions/${id}/`)),
   createTx: (payload) => unwrap(client.post('/ledger/transactions/', payload)),
+  updateTx: (id, payload) => unwrap(client.patch(`/ledger/transactions/${id}/`, payload)),
+  removeTx: (id) => unwrap(client.delete(`/ledger/transactions/${id}/`)),
 }
 
 /** 导出账单：响应是 CSV 文件流，不能走 unwrap 解包 */

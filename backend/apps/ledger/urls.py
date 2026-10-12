@@ -7,6 +7,7 @@ from apps.ledger.views import (
     AIConfigView,
     CategoryViewSet,
     ImportTaskViewSet,
+    MerchantHistoryView,
     OverviewView,
     ReportInsightView,
     ReportView,
@@ -20,6 +21,7 @@ router.register(r'imports', ImportTaskViewSet, basename='import-task')
 
 urlpatterns = [
     path('overview/', OverviewView.as_view(), name='ledger-overview'),
+    path('merchants/history/', MerchantHistoryView.as_view(), name='ledger-merchant-history'),
     path('report/', ReportView.as_view(), name='ledger-report'),
     path('report/insight/', ReportInsightView.as_view(), name='ledger-report-insight'),
     path('ai/config/', AIConfigView.as_view(), name='ledger-ai-config'),

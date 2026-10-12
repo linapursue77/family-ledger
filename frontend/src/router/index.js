@@ -13,6 +13,8 @@ const routes = [
   { path: '/family', name: 'family', component: () => import('@/views/Family.vue') },
   // 借钱来往：借出/借入台账，二级页保留底部 TabBar
   { path: '/loans', name: 'loans', component: () => import('@/views/Loans.vue') },
+  // 收益管理：一年收益变化 + 今年收益对家庭总资产的影响
+  { path: '/returns', name: 'returns', component: () => import('@/views/Returns.vue') },
   // 邀请落地页：从分享链接进入，接受后才算加入家庭，因此不挂 TabBar
   { path: '/join', name: 'join', component: () => import('@/views/Join.vue'), meta: { tab: false } },
 ]

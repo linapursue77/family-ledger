@@ -48,11 +48,12 @@ function answerConfirm(ok) {
   if (fn) fn(ok)
 }
 
-const DEFAULT_BOOK = { shared: '共同账本', husband: '老公账本', wife: '老婆账本' }
+// 内置默认名保持中性（不预设成员关系），家庭可在账本名称里改成任意叫法
+const DEFAULT_BOOK = { shared: '共同账本', husband: '账本一', wife: '账本二' }
 const BOOK_LIST = [
   { code: 'shared', label: '共同账本' },
-  { code: 'husband', label: '老公账本' },
-  { code: 'wife', label: '老婆账本' },
+  { code: 'husband', label: '账本一' },
+  { code: 'wife', label: '账本二' },
 ]
 
 // ★ 授权项：中文说明 + 控件类型，授权弹层与邀请预设共用同一份配置
@@ -551,7 +552,7 @@ onMounted(async () => {
             <input
               v-model="inviteForm.nickname"
               class="fld-input"
-              placeholder="如：老婆 / 爸爸 / 儿子"
+              placeholder="如：小林的账 / 日常公共账"
               maxlength="50"
             />
           </div>
@@ -667,7 +668,7 @@ onMounted(async () => {
         </div>
         <div class="fld">
           <label class="fld-label">家庭内称呼</label>
-          <input v-model="memberForm.nickname" class="fld-input" placeholder="如：老公" maxlength="50" />
+          <input v-model="memberForm.nickname" class="fld-input" placeholder="如：小林" maxlength="50" />
         </div>
         <div v-if="isOwner" class="fld">
           <label class="fld-label">所属账本</label>

@@ -2,7 +2,7 @@
   <view class="brand">
     <view class="brand-icon">💰</view>
     <view class="brand-name">家庭财务通</view>
-    <view class="brand-sub">夫妻共同记账 · 平衡透明与隐私</view>
+    <view class="brand-sub">一起记账 · 平衡透明与隐私</view>
   </view>
 
   <view class="form card">
