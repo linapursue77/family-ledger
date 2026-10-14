@@ -25,6 +25,33 @@
     <view wx:if="{{!accounts.length}}" class="empty">暂无账户，点击右上角新增</view>
   </view>
 
+  <!-- 更多功能 -->
+  <view class="card section">
+    <view class="section-head">
+      <text class="section-title">更多功能</text>
+    </view>
+    <view class="list-item" bindtap="goAccounts">
+      <text class="acc-icon">🏦</text>
+      <text class="acc-name">账户管理</text>
+      <text class="arrow">›</text>
+    </view>
+    <view class="list-item" bindtap="goLoans">
+      <text class="acc-icon">🤝</text>
+      <text class="acc-name">借出借入</text>
+      <text class="arrow">›</text>
+    </view>
+    <view class="list-item" bindtap="goReturns">
+      <text class="acc-icon">📈</text>
+      <text class="acc-name">收益管理</text>
+      <text class="arrow">›</text>
+    </view>
+    <view class="list-item" bindtap="goFamily">
+      <text class="acc-icon">🏠</text>
+      <text class="acc-name">家庭管理</text>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+
   <!-- 登录密码：微信一键登录的账号默认没有密码，设置后可在网页版登录 -->
   <view class="card section">
     <view class="section-head" bindtap="openPwd">

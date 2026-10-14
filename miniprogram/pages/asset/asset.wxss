@@ -1,0 +1,273 @@
+.page {
+  padding: 24rpx 24rpx 40rpx;
+}
+
+.loading {
+  padding: 80rpx 0;
+  text-align: center;
+  color: #888780;
+  font-size: 26rpx;
+}
+
+.hint {
+  font-size: 22rpx;
+  color: #b0aeaa;
+  text-align: center;
+  padding: 12rpx 0;
+}
+
+.card {
+  background: #fff;
+  border: 1rpx solid #e8e8e8;
+  border-radius: 24rpx;
+  overflow: hidden;
+}
+
+.card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #26215c;
+  padding: 24rpx 28rpx 8rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #26215c;
+  margin: 32rpx 0 16rpx;
+}
+
+/* ---- 净值曲线：CSS 柱状图 ---- */
+.net-card {
+  padding-bottom: 16rpx;
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  height: 220rpx;
+  padding: 0 20rpx;
+}
+.bar-wrap {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+.bar {
+  width: 60%;
+  background: linear-gradient(180deg, #7ea6fb, #4f7ef7);
+  border-radius: 6rpx 6rpx 0 0;
+  min-height: 4rpx;
+}
+.bar-label {
+  font-size: 18rpx;
+  color: #888780;
+  margin-top: 8rpx;
+}
+.bar-tip {
+  font-size: 20rpx;
+  color: #b0aeaa;
+  text-align: center;
+  padding-top: 8rpx;
+}
+
+/* ---- 资产构成 ---- */
+.compose {
+  display: flex;
+  align-items: center;
+  padding: 24rpx;
+  gap: 20rpx;
+}
+.donut-wrap {
+  position: relative;
+  width: 240rpx;
+  height: 240rpx;
+  flex-shrink: 0;
+}
+.donut {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+.donut-center {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.donut-total {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #26215c;
+}
+.donut-label {
+  font-size: 22rpx;
+  color: #888780;
+  margin-top: 4rpx;
+}
+.legend {
+  flex: 1;
+  min-width: 0;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  padding: 10rpx 0;
+}
+.dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 12rpx;
+}
+.legend-name {
+  flex: 1;
+  font-size: 24rpx;
+  color: #5f5e5a;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.legend-amount {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #26215c;
+  margin-right: 12rpx;
+}
+.legend-pct {
+  font-size: 20rpx;
+  min-width: 64rpx;
+  text-align: right;
+}
+
+/* ---- 净资产 ---- */
+.net-line {
+  margin-top: 24rpx;
+  padding: 8rpx 28rpx;
+  background: #fffdf7;
+}
+.nl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f5f3ec;
+  font-size: 24rpx;
+  color: #5f5e5a;
+}
+.nl-row:last-child {
+  border-bottom: none;
+}
+.nl-value {
+  color: #26215c;
+  font-variant-numeric: tabular-nums;
+}
+.nl-value.plus {
+  color: #1d9e75;
+}
+.nl-value.minus {
+  color: #ba7517;
+}
+.nl-row.total {
+  font-weight: 700;
+  color: #26215c;
+}
+
+/* ---- 分组 ---- */
+.group {
+  margin-bottom: 24rpx;
+}
+.group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx;
+  background: #faf9f5;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #26215c;
+}
+.group-total {
+  font-variant-numeric: tabular-nums;
+}
+.group-total.link {
+  color: #534ab7;
+  font-weight: 400;
+  font-size: 24rpx;
+}
+.g-profit {
+  font-size: 22rpx;
+  margin-left: 12rpx;
+}
+.up {
+  color: #1d9e75;
+}
+.down {
+  color: #d03b3b;
+}
+
+.acc-row {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 28rpx;
+  border-top: 1rpx solid #f1efe8;
+}
+.acc-icon {
+  font-size: 32rpx;
+  margin-right: 20rpx;
+}
+.acc-name {
+  flex: 1;
+  font-size: 26rpx;
+  color: #2c2c2a;
+}
+.acc-tag {
+  font-size: 18rpx;
+  color: #534ab7;
+  background: #eeedfe;
+  border-radius: 8rpx;
+  padding: 2rpx 8rpx;
+  margin-left: 8rpx;
+}
+.acc-balance {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #26215c;
+  font-variant-numeric: tabular-nums;
+}
+.acc-balance.warn {
+  color: #ba7517;
+}
+.acc-balance.muted {
+  color: #888780;
+  font-weight: 400;
+}
+.acc-profit-line {
+  padding: 0 28rpx 16rpx 76rpx;
+  margin-top: -8rpx;
+  font-size: 22rpx;
+  color: #888780;
+}
+.acc-empty {
+  padding: 24rpx 28rpx;
+  font-size: 24rpx;
+  color: #b0aeaa;
+}
+.acc-empty.danger {
+  color: #d03b3b;
+}
+
+.tip {
+  text-align: center;
+  font-size: 22rpx;
+  color: #b0aeaa;
+  padding: 12rpx 0;
+}

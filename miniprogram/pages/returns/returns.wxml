@@ -1,0 +1,175 @@
+<view class="page">
+  <!-- 账本切换 -->
+  <view class="filter-bar" wx:if="{{bookTabs.length > 2}}">
+    <picker range="{{bookTabs}}" range-key="label" value="{{bookIndex}}" bindchange="onBook">
+      <view class="chip active">{{bookTabs[bookIndex].label || '全部账本'}} ▾</view>
+    </picker>
+  </view>
+
+  <block wx:if="{{d && d.has_invest}}">
+    <!-- 总览 -->
+    <view class="asset-card">
+      <view class="label">投资总金额</view>
+      <view class="amount">¥{{view.value}}</view>
+      <view class="hero-row">
+        <view class="hero-cell">
+          <text class="hero-label">累计收益</text>
+          <text class="hero-value {{view.profitPositive ? 'up' : 'down'}}">
+            {{view.profit}}
+          </text>
+        </view>
+        <view class="hero-cell">
+          <text class="hero-label">收益率</text>
+          <text class="hero-value {{view.profitPositive ? 'up' : 'down'}}">{{view.rate}}</text>
+        </view>
+      </view>
+      <view class="split-bar">
+        <view class="split-principal" style="width: {{view.principalPct}}%"></view>
+      </view>
+      <view class="split-legend">
+        <text>本金 ¥{{view.principal}}</text>
+        <text>收益 ¥{{view.profit}}</text>
+      </view>
+    </view>
+
+    <!-- 今年收益 -->
+    <view class="card">
+      <view class="section-title">今年收益（基准 {{view.beginYm}}）</view>
+      <view class="year-row">
+        <view class="year-main">
+          <text class="year-value {{view.yearPositive ? 'text-income' : 'text-expense'}}">
+            {{view.yearProfit}}
+          </text>
+          <text class="year-rate">收益率 {{view.yearRate}}</text>
+        </view>
+        <view class="year-side">
+          <text class="side-label">占家庭净资产</text>
+          <text class="side-value">{{view.yearPct}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 收益对资产的影响 -->
+    <view class="card">
+      <view class="section-title">对家庭总资产的影响</view>
+      <view class="kv-row">
+        <text class="kv-label">家庭净资产</text>
+        <text class="kv-value">¥{{view.netAssets}}</text>
+      </view>
+      <view class="kv-row">
+        <text class="kv-label">其中投资收益</text>
+        <text class="kv-value">{{view.pct}}</text>
+      </view>
+      <view class="kv-row">
+        <text class="kv-label">剔除收益后</text>
+        <text class="kv-value">¥{{view.exProfit}}</text>
+      </view>
+      <view class="kv-hint">净资产 = 账户资产 + 应收 − 应付，含投资收益。</view>
+    </view>
+
+    <!-- 一年收益变化 -->
+    <view class="card" wx:if="{{bars.length}}">
+      <view class="section-title">近一年收益变化</view>
+      <view class="chart">
+        <view class="chart-axis"></view>
+        <view class="chart-bars">
+          <view class="bar-col" wx:for="{{bars}}" wx:key="ym">
+            <view class="bar-wrap">
+              <view
+                class="bar {{item.positive ? 'up' : 'down'}}"
+                style="height: {{item.height}}%"
+              ></view>
+            </view>
+            <text class="bar-label">{{item.label}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="chart-note">柱子在上方为盈利、下方为亏损，高度按绝对值缩放。</view>
+    </view>
+
+    <!-- 明细 -->
+    <view class="card">
+      <view class="tab-row">
+        <view
+          class="tab-btn {{detailTab === 'account' ? 'active' : ''}}"
+          data-tab="account"
+          bindtap="onDetailTab"
+        >按账户</view>
+        <view
+          class="tab-btn {{detailTab === 'month' ? 'active' : ''}}"
+          data-tab="month"
+          bindtap="onDetailTab"
+        >按月</view>
+      </view>
+
+      <block wx:if="{{detailTab === 'account'}}">
+        <view
+          class="acc-row"
+          wx:for="{{accounts}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="openPrincipal"
+        >
+          <text class="acc-icon">{{item.icon}}</text>
+          <view class="acc-info">
+            <text class="acc-name">{{item.name}}</text>
+            <text class="acc-sub text-muted">
+              本金 ¥{{item.principalText}} · 现值 ¥{{item.valueText}}
+            </text>
+          </view>
+          <view class="acc-right">
+            <text class="acc-profit {{item.profit_cents >= 0 ? 'text-income' : 'text-expense'}}">
+              {{item.profitText}}
+            </text>
+            <text class="acc-rate text-muted">{{item.rateText}} · 今年 {{item.yearText}}</text>
+          </view>
+        </view>
+      </block>
+
+      <block wx:else>
+        <view class="month-row" wx:for="{{monthly}}" wx:key="ym">
+          <text class="month-label">{{item.label}}</text>
+          <text class="month-value {{item.positive ? 'text-income' : 'text-expense'}}">
+            {{item.text}}
+          </text>
+        </view>
+        <view wx:if="{{!monthly.length}}" class="empty-sm">暂无月度收益数据</view>
+      </block>
+    </view>
+  </block>
+
+  <!-- 没有投资账户 -->
+  <view wx:if="{{d && !d.has_invest}}" class="empty-wrap">
+    <view class="empty">还没有纳入收益管理的账户</view>
+    <view class="empty-tip">在「账户管理」里把基金、股票等账户的「纳入收益管理」打开，并维护投入本金。</view>
+    <button class="btn-primary go-btn" bindtap="goAccounts">去账户管理</button>
+  </view>
+
+  <!-- 盘点本金 -->
+  <view wx:if="{{showPrincipal}}" class="sheet-mask" bindtap="closePrincipal">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">盘点本金 · {{current.name}}</text>
+        <text class="sheet-close" bindtap="closePrincipal">×</text>
+      </view>
+      <view class="mode-row">
+        <view class="mode-btn {{principalMode === 'set' ? 'active' : ''}}" data-mode="set" bindtap="onMode">
+          设为该值（盘点）
+        </view>
+        <view class="mode-btn {{principalMode === 'add' ? 'active' : ''}}" data-mode="add" bindtap="onMode">
+          追加（加仓）
+        </view>
+      </view>
+      <view class="field-row">
+        <text class="field-label">{{principalMode === 'set' ? '本金总额' : '本次追加'}}</text>
+        <input type="digit" placeholder="0.00" value="{{principalValue}}" bindinput="onPrincipalValue" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">说明</text>
+        <input placeholder="选填，如：每月定投" value="{{principalReason}}" bindinput="onPrincipalReason" />
+      </view>
+      <button class="btn-primary" bindtap="onSavePrincipal">保存</button>
+      <view class="form-note">收益 = 现值 − 本金。现值来自账户余额，可用「调整余额」更新。</view>
+    </view>
+  </view>
+</view>

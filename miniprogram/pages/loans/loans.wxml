@@ -1,0 +1,178 @@
+<view class="page">
+  <!-- 总览 -->
+  <view class="asset-card">
+    <view class="label">应收 − 应付</view>
+    <view class="amount {{summary && summary.net_cents >= 0 ? '' : 'negative'}}">
+      {{summary && summary.net_cents >= 0 ? '+' : '-'}}¥{{summaryText.net}}
+    </view>
+    <view class="sum-row">
+      <view class="sum-cell">
+        <text class="sum-label">别人欠我</text>
+        <text class="sum-value">¥{{summaryText.lend}}</text>
+      </view>
+      <view class="sum-cell">
+        <text class="sum-label">我欠别人</text>
+        <text class="sum-value">¥{{summaryText.borrow}}</text>
+      </view>
+      <view class="sum-cell">
+        <text class="sum-label">逾期</text>
+        <text class="sum-value">{{summary.overdue_count || 0}} 笔</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 筛选 -->
+  <view class="filter-bar">
+    <picker range="{{directions}}" range-key="label" value="{{dirIndex}}" bindchange="onDir">
+      <view class="chip {{dirIndex > 0 ? 'active' : ''}}">{{directions[dirIndex].label}} ▾</view>
+    </picker>
+    <picker range="{{states}}" range-key="label" value="{{stateIndex}}" bindchange="onState">
+      <view class="chip {{stateIndex > 0 ? 'active' : ''}}">{{states[stateIndex].label}} ▾</view>
+    </picker>
+    <input
+      class="search-input"
+      placeholder="搜对方"
+      value="{{keyword}}"
+      confirm-type="search"
+      bindinput="onKeyword"
+      bindconfirm="onSearch"
+    />
+  </view>
+
+  <!-- 列表 -->
+  <view wx:if="{{!items.length && !loading}}" class="empty">还没有借出借入记录</view>
+
+  <view wx:for="{{items}}" wx:key="id" class="card loan-card">
+    <view class="loan-head">
+      <view class="loan-title">
+        <text class="loan-dir {{item.direction === 'lend' ? 'text-income' : 'text-expense'}}">
+          {{item.direction_display}}
+        </text>
+        <text class="loan-party">{{item.party}}</text>
+      </view>
+      <text class="loan-amount">¥{{item.amountText}}</text>
+    </view>
+
+    <view class="loan-progress">
+      <view class="progress-bar">
+        <view class="progress-fill" style="width: {{item.progress}}%"></view>
+      </view>
+      <view class="loan-meta">
+        <text>已还 ¥{{item.repaidText}}</text>
+        <text class="text-primary">待还 ¥{{item.remainingText}}</text>
+        <text class="loan-status">{{item.status_display}}{{item.overdueText}}</text>
+      </view>
+    </view>
+
+    <view class="loan-dates text-muted">
+      <text>{{item.loanDateText}}</text>
+      <text>{{item.dueText}}</text>
+    </view>
+    <view wx:if="{{item.note}}" class="loan-note">{{item.note}}</view>
+
+    <view wx:if="{{item.payments.length}}" class="payment-list">
+      <view
+        class="payment-row"
+        wx:for="{{item.payments}}"
+        wx:for-item="p"
+        wx:key="id"
+      >
+        <text class="payment-date">{{p.dateText}}</text>
+        <text class="payment-amount">¥{{p.amountText}}</text>
+        <text wx:if="{{p.account_name}}" class="payment-acc text-muted">{{p.account_name}}</text>
+        <text
+          class="payment-del"
+          data-id="{{p.id}}"
+          bindtap="onDeletePayment"
+        >删除</text>
+      </view>
+    </view>
+
+    <view class="loan-actions">
+      <view class="link-btn" data-id="{{item.id}}" bindtap="openRepay">登记还款</view>
+      <view class="link-btn danger" data-id="{{item.id}}" bindtap="onDeleteLoan">删除</view>
+    </view>
+  </view>
+
+  <view class="fab" bindtap="openAdd">＋</view>
+
+  <!-- 新增借款 -->
+  <view wx:if="{{showAdd}}" class="sheet-mask" bindtap="closeAdd">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">记一笔借出 / 借入</text>
+        <text class="sheet-close" bindtap="closeAdd">×</text>
+      </view>
+
+      <view class="mode-row">
+        <view class="mode-btn {{form.direction === 'lend' ? 'active' : ''}}" bindtap="onLend">
+          我借出（别人欠我）
+        </view>
+        <view class="mode-btn {{form.direction === 'borrow' ? 'active' : ''}}" bindtap="onBorrow">
+          我借入（我欠别人）
+        </view>
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">对方</text>
+        <input placeholder="如：张三" value="{{form.party}}" data-field="party" bindinput="onField" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">金额</text>
+        <input
+          type="digit"
+          placeholder="0.00"
+          value="{{form.amount}}"
+          data-field="amount"
+          bindinput="onField"
+        />
+      </view>
+      <view class="field-row">
+        <text class="field-label">发生日期</text>
+        <picker mode="date" value="{{form.loanDate}}" data-field="loanDate" bindchange="onDate">
+          <view class="field-value">{{form.loanDate}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">约定还款</text>
+        <picker mode="date" value="{{form.dueDate}}" data-field="dueDate" bindchange="onDate">
+          <view class="field-value">{{form.dueDate || '选填'}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">备注</text>
+        <input placeholder="选填" value="{{form.note}}" data-field="note" bindinput="onField" />
+      </view>
+
+      <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSaveLoan">
+        {{saving ? '保存中…' : '保存'}}
+      </button>
+    </view>
+  </view>
+
+  <!-- 登记还款 -->
+  <view wx:if="{{showRepay}}" class="sheet-mask" bindtap="closeRepay">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">登记还款 · {{current.party}}</text>
+        <text class="sheet-close" bindtap="closeRepay">×</text>
+      </view>
+      <view class="repay-tip">待还 ¥{{current.remainingText}}，可按实际回款金额修改。</view>
+      <view class="field-row">
+        <text class="field-label">还款金额</text>
+        <input type="digit" value="{{repayAmount}}" bindinput="onRepayAmount" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">还款日期</text>
+        <picker mode="date" value="{{repayDate}}" bindchange="onRepayDate">
+          <view class="field-value">{{repayDate}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">备注</text>
+        <input placeholder="选填" value="{{repayNote}}" bindinput="onRepayNote" />
+      </view>
+      <button class="btn-primary" bindtap="onSaveRepay">保存</button>
+    </view>
+  </view>
+</view>

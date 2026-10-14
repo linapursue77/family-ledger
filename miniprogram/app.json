@@ -5,7 +5,12 @@
     "pages/import/import",
     "pages/report/report",
     "pages/mine/mine",
-    "pages/login/login"
+    "pages/login/login",
+    "pages/accounts/accounts",
+    "pages/loans/loans",
+    "pages/family/family",
+    "pages/returns/returns",
+    "pages/asset/asset"
   ],
   "window": {
     "navigationBarBackgroundColor": "#f1efe8",

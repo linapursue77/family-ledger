@@ -1,0 +1,133 @@
+<view class="page">
+  <view class="asset-card">
+    <view class="label">我的家庭</view>
+    <view class="amount family-name">{{family.name || '我的家庭'}}</view>
+    <view class="fam-meta">
+      <text>{{limitText}}</text>
+      <text wx:if="{{isOwner}}"> · 你是主账号</text>
+    </view>
+  </view>
+
+  <!-- 成员 -->
+  <view class="card">
+    <view class="section-head">
+      <text class="section-title">家庭成员</text>
+    </view>
+    <view
+      class="member-row"
+      wx:for="{{members}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="openMember"
+    >
+      <view class="avatar">{{item.initial}}</view>
+      <view class="member-info">
+        <view class="member-line">
+          <text class="member-name">{{item.display}}</text>
+          <text class="role-tag {{item.role === 'owner' ? 'owner' : ''}}">{{item.roleText}}</text>
+          <text wx:if="{{item.id === family.my_id}}" class="self-tag">我</text>
+        </view>
+        <text class="member-sub text-muted">{{item.bookLabel}} · {{item.permText}}</text>
+      </view>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 邀请 -->
+  <view wx:if="{{isOwner}}" class="card">
+    <view class="section-head">
+      <text class="section-title">邀请成员</text>
+      <text class="add-btn" bindtap="openInvite">＋ 生成邀请</text>
+    </view>
+    <view wx:if="{{!invites.length}}" class="empty-sm">暂无待接受的邀请</view>
+    <view class="invite-row" wx:for="{{invites}}" wx:key="id">
+      <view class="invite-info">
+        <text class="invite-name">{{item.nickname}}</text>
+        <text class="invite-sub text-muted">
+          {{item.statusText}} · {{item.dateText}}<block wx:if="{{item.contact}}"> · {{item.contact}}</block>
+        </text>
+      </view>
+      <text wx:if="{{item.status === 'pending'}}" class="link-btn danger" data-id="{{item.id}}" bindtap="onRevokeInvite">
+        撤销
+      </text>
+    </view>
+  </view>
+
+  <!-- 协商阈值 -->
+  <view class="card">
+    <view class="section-head">
+      <text class="section-title">协商阈值（元）</text>
+    </view>
+    <view class="field-row">
+      <text class="field-label">小额自主</text>
+      <input type="digit" placeholder="0" value="{{th.small}}" data-field="small" bindinput="onTh" />
+    </view>
+    <view class="field-row">
+      <text class="field-label">事后知会</text>
+      <input type="digit" placeholder="0" value="{{th.notify}}" data-field="notify" bindinput="onTh" />
+    </view>
+    <view class="field-row">
+      <text class="field-label">事前申请</text>
+      <input type="digit" placeholder="0" value="{{th.approve}}" data-field="approve" bindinput="onTh" />
+    </view>
+    <button class="btn-primary" bindtap="onSaveThresholds">保存阈值</button>
+    <view class="form-note">小额自主 &lt; 事后知会 &lt; 事前申请。超过阈值的支出会进入协商流程。</view>
+  </view>
+
+  <!-- 生成邀请 -->
+  <view wx:if="{{showInvite}}" class="sheet-mask" bindtap="closeInvite">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">生成邀请</text>
+        <text class="sheet-close" bindtap="closeInvite">×</text>
+      </view>
+      <view class="field-row">
+        <text class="field-label">对方称呼</text>
+        <input placeholder="如：老婆" value="{{inviteNickname}}" bindinput="onInviteNickname" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">联系方式</text>
+        <input placeholder="选填，方便你记住" value="{{inviteContact}}" bindinput="onInviteContact" />
+      </view>
+      <button class="btn-primary {{inviting ? 'disabled' : ''}}" bindtap="onCreateInvite">
+        {{inviting ? '生成中…' : '生成邀请码'}}
+      </button>
+
+      <view wx:if="{{newToken}}" class="token-box">
+        <text class="token-label">邀请码（7 天内有效，只显示这一次）</text>
+        <text class="token-value" user-select>{{newToken}}</text>
+        <view class="token-copy" bindtap="copyToken">复制邀请码</view>
+        <view class="form-note">把邀请码发给对方，在网页版「加入家庭」里填入即可。</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 成员详情 -->
+  <view wx:if="{{showMember}}" class="sheet-mask" bindtap="closeMember">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">{{current.display}}</text>
+        <text class="sheet-close" bindtap="closeMember">×</text>
+      </view>
+      <view class="field-row">
+        <text class="field-label">称呼</text>
+        <input value="{{editNickname}}" bindinput="onEditNickname" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">所属账本</text>
+        <picker range="{{books}}" range-key="label" value="{{editBookIndex}}" bindchange="onEditBook">
+          <view class="field-value">{{books[editBookIndex].label}} ›</view>
+        </picker>
+      </view>
+      <view wx:if="{{!isOwner}}" class="form-note">
+        只有主账号能改账本；你只能改自己的称呼。
+      </view>
+      <button class="btn-primary" bindtap="onSaveMember">保存</button>
+
+      <block wx:if="{{isOwner && current.role !== 'owner'}}">
+        <view class="action-item" bindtap="onTransferOwner">👑 转让主账号给 TA</view>
+        <view class="action-item danger" bindtap="onRemoveMember">🗑 移除成员</view>
+      </block>
+    </view>
+  </view>
+</view>

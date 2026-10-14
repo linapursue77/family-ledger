@@ -178,4 +178,17 @@ Page({
       },
     })
   },
+
+  goAccounts() {
+    wx.navigateTo({ url: '/pages/accounts/accounts' })
+  },
+  goLoans() {
+    wx.navigateTo({ url: '/pages/loans/loans' })
+  },
+  goReturns() {
+    wx.navigateTo({ url: '/pages/returns/returns' })
+  },
+  goFamily() {
+    wx.navigateTo({ url: '/pages/family/family' })
+  },
 })

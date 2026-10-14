@@ -23,10 +23,30 @@
 
   <block wx:if="{{ov}}">
     <!-- 资产卡 -->
-    <view class="asset-card">
+    <view class="asset-card" bindtap="goAsset">
       <view class="label">🏦 家庭总资产</view>
       <view class="amount">¥{{ov.total_assets}}</view>
       <view class="change">{{assetChange}} › 点击查看净值曲线</view>
+    </view>
+
+    <!-- 快捷入口 -->
+    <view class="quick-grid">
+      <view class="quick-item" bindtap="goAccounts">
+        <text class="quick-icon">🏦</text>
+        <text class="quick-text">账户</text>
+      </view>
+      <view class="quick-item" bindtap="goLoans">
+        <text class="quick-icon">🤝</text>
+        <text class="quick-text">借出借入</text>
+      </view>
+      <view class="quick-item" bindtap="goReturns">
+        <text class="quick-icon">📈</text>
+        <text class="quick-text">收益</text>
+      </view>
+      <view class="quick-item" bindtap="goFamily">
+        <text class="quick-icon">🏠</text>
+        <text class="quick-text">家庭</text>
+      </view>
     </view>
 
     <!-- 收支切换 -->

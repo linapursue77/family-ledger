@@ -89,6 +89,30 @@
   opacity: 0.9;
 }
 
+/* 快捷入口 */
+.quick-grid {
+  display: flex;
+  background: #fff;
+  border-radius: 20rpx;
+  margin: 0 24rpx 16rpx;
+  padding: 20rpx 0;
+  border: 1rpx solid #e8e8e8;
+}
+.quick-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+.quick-icon {
+  font-size: 40rpx;
+}
+.quick-text {
+  font-size: 22rpx;
+  color: #5f5e5a;
+}
+
 /* 收支切换 */
 .income-expense-toggle {
   display: flex;

@@ -1,0 +1,259 @@
+<view class="page">
+  <view class="asset-card">
+    <view class="label">账户总资产</view>
+    <view class="amount">¥{{totalText}}</view>
+    <view class="change">{{statsText}}</view>
+  </view>
+
+  <view wx:for="{{groups}}" wx:key="key" class="card">
+    <view class="group-head">
+      <text class="section-title">{{item.label}}</text>
+      <text class="group-total">¥{{item.totalText}}</text>
+    </view>
+    <view
+      class="list-item"
+      wx:for="{{item.items}}"
+      wx:for-item="acc"
+      wx:key="id"
+      data-id="{{acc.id}}"
+      bindtap="onAccTap"
+    >
+      <text class="acc-icon">{{acc.icon}}</text>
+      <view class="acc-info">
+        <text class="acc-name">{{acc.name}}</text>
+        <text class="acc-book text-muted">
+          {{acc.cardLabel}}<block wx:if="{{acc.bankText}}"> · {{acc.bankText}}</block>
+        </text>
+      </view>
+      <view class="acc-right">
+        <text class="acc-balance">¥{{acc.balanceText}}</text>
+        <block wx:if="{{acc.is_invest}}">
+          <text class="acc-profit {{acc.profit_cents >= 0 ? 'text-income' : 'text-expense'}}">
+            收益 {{acc.profitText}}<block wx:if="{{acc.rateText}}"> ({{acc.rateText}})</block>
+          </text>
+        </block>
+        <text wx:else class="acc-vis text-muted">{{acc.visLabel}}</text>
+      </view>
+    </view>
+    <view wx:if="{{!item.items.length}}" class="empty-sm">该账本还没有账户</view>
+  </view>
+
+  <view class="fab" bindtap="openAdd">＋</view>
+
+  <!-- 账户操作面板 -->
+  <view wx:if="{{showActions}}" class="sheet-mask" bindtap="closeActions">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">{{current.name}}</text>
+        <text class="sheet-close" bindtap="closeActions">×</text>
+      </view>
+      <view class="action-item" bindtap="openEdit">✏️ 编辑账户</view>
+      <view class="action-item" bindtap="openAdjust">⚖️ 调整余额</view>
+      <view class="action-item" bindtap="openPrincipal">📊 盘点本金（收益）</view>
+      <view class="action-item danger" bindtap="onDelete">🗑 删除账户</view>
+    </view>
+  </view>
+
+  <!-- 新增 / 编辑账户 -->
+  <view wx:if="{{showEdit}}" class="sheet-mask" bindtap="closeEdit">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">{{editing ? '编辑账户' : '新增账户'}}</text>
+        <text class="sheet-close" bindtap="closeEdit">×</text>
+      </view>
+
+      <view class="icon-grid">
+        <view
+          class="icon-cell {{form.icon === item ? 'active' : ''}}"
+          wx:for="{{icons}}"
+          wx:key="*this"
+          data-icon="{{item}}"
+          bindtap="onIcon"
+        >{{item}}</view>
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">名称</text>
+        <input
+          placeholder="如：招商银行"
+          value="{{form.name}}"
+          data-field="name"
+          bindinput="onInput"
+        />
+      </view>
+      <view class="field-row">
+        <text class="field-label">介质</text>
+        <picker
+          range="{{cardTypes}}"
+          range-key="label"
+          value="{{form.cardIndex}}"
+          data-field="cardIndex"
+          bindchange="onPick"
+        >
+          <view class="field-value">{{cardTypes[form.cardIndex].label}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">账本</text>
+        <picker
+          range="{{books}}"
+          range-key="label"
+          value="{{form.bookIndex}}"
+          data-field="bookIndex"
+          bindchange="onPick"
+        >
+          <view class="field-value">{{books[form.bookIndex].label}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">可见性</text>
+        <picker
+          range="{{visibility}}"
+          range-key="label"
+          value="{{form.visIndex}}"
+          data-field="visIndex"
+          bindchange="onPick"
+        >
+          <view class="field-value">{{visibility[form.visIndex].label}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">开户行</text>
+        <input
+          placeholder="选填"
+          value="{{form.bankName}}"
+          data-field="bankName"
+          bindinput="onInput"
+        />
+      </view>
+      <view class="field-row">
+        <text class="field-label">账号</text>
+        <input
+          placeholder="建议只填尾号"
+          value="{{form.accountNo}}"
+          data-field="accountNo"
+          bindinput="onInput"
+        />
+      </view>
+
+      <view class="switch-row">
+        <text>计入总资产</text>
+        <switch
+          checked="{{form.isCountTotal}}"
+          color="#7f77dd"
+          data-field="isCountTotal"
+          bindchange="onSwitch"
+        />
+      </view>
+      <view class="switch-row">
+        <view class="switch-label">
+          <text>纳入收益管理</text>
+          <text class="switch-hint">开启后按「现值 − 本金」统计收益</text>
+        </view>
+        <switch
+          checked="{{form.isInvest}}"
+          color="#7f77dd"
+          data-field="isInvest"
+          bindchange="onSwitch"
+        />
+      </view>
+
+      <view wx:if="{{form.isInvest}}" class="field-row">
+        <text class="field-label">收益总额</text>
+        <input
+          type="digit"
+          placeholder="{{editing ? '当前累计收益，亏损填负数' : '不填则视为 0'}}"
+          value="{{form.profit}}"
+          data-field="profit"
+          bindinput="onInput"
+        />
+      </view>
+      <view wx:if="{{!editing}}" class="field-row">
+        <text class="field-label">初始余额</text>
+        <input
+          type="digit"
+          placeholder="0.00"
+          value="{{form.balance}}"
+          data-field="balance"
+          bindinput="onInput"
+        />
+      </view>
+
+      <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSave">
+        {{saving ? '保存中…' : '保存'}}
+      </button>
+      <view wx:if="{{editing}}" class="form-note">
+        余额请用「调整余额」修改，避免直接改数字导致流水对不上。
+      </view>
+    </view>
+  </view>
+
+  <!-- 调整余额 -->
+  <view wx:if="{{showAdjust}}" class="sheet-mask" bindtap="closeAdjust">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">调整余额 · {{current.name}}</text>
+        <text class="sheet-close" bindtap="closeAdjust">×</text>
+      </view>
+      <view class="field-row">
+        <text class="field-label">实际余额</text>
+        <input
+          type="digit"
+          placeholder="0.00"
+          value="{{adjustBalance}}"
+          bindinput="onAdjustBalance"
+        />
+      </view>
+      <view class="field-row">
+        <text class="field-label">说明</text>
+        <input
+          placeholder="如：月底核对后修正"
+          value="{{adjustReason}}"
+          bindinput="onAdjustReason"
+        />
+      </view>
+      <button class="btn-primary" bindtap="onSaveAdjust">保存</button>
+    </view>
+  </view>
+
+  <!-- 盘点本金 -->
+  <view wx:if="{{showPrincipal}}" class="sheet-mask" bindtap="closePrincipal">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">盘点本金 · {{current.name}}</text>
+        <text class="sheet-close" bindtap="closePrincipal">×</text>
+      </view>
+      <view class="mode-row">
+        <view
+          class="mode-btn {{principalMode === 'set' ? 'active' : ''}}"
+          data-mode="set"
+          bindtap="onMode"
+        >设为该值（盘点）</view>
+        <view
+          class="mode-btn {{principalMode === 'add' ? 'active' : ''}}"
+          data-mode="add"
+          bindtap="onMode"
+        >追加（加仓）</view>
+      </view>
+      <view class="field-row">
+        <text class="field-label">{{principalMode === 'set' ? '本金总额' : '本次追加'}}</text>
+        <input
+          type="digit"
+          placeholder="0.00"
+          value="{{principalValue}}"
+          bindinput="onPrincipalValue"
+        />
+      </view>
+      <view class="field-row">
+        <text class="field-label">说明</text>
+        <input
+          placeholder="选填，如：每月定投"
+          value="{{principalReason}}"
+          bindinput="onPrincipalReason"
+        />
+      </view>
+      <button class="btn-primary" bindtap="onSavePrincipal">保存</button>
+      <view class="form-note">收益 = 现值 − 本金。本金填准了，收益才准。</view>
+    </view>
+  </view>
+</view>

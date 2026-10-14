@@ -43,6 +43,10 @@
   font-weight: 700;
   color: var(--text-main);
 }
+.arrow {
+  font-size: 34rpx;
+  color: #c8c6c0;
+}
 .add-btn {
   color: var(--primary);
   font-size: 28rpx;

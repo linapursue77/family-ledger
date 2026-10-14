@@ -12,7 +12,33 @@ module.exports = {
   // 账户
   accounts: () => request('GET', '/accounts/'),
   createAccount: (data) => request('POST', '/accounts/', data),
+  // 编辑账户：打开「纳入收益管理」用同一个接口，本金单独走 principal
+  updateAccount: (id, data) => request('PATCH', `/accounts/${id}/`, data),
+  deleteAccount: (id) => request('DELETE', `/accounts/${id}/`),
   adjustAccount: (id, data) => request('POST', `/accounts/${id}/adjust/`, data),
+  setPrincipal: (id, data) => request('POST', `/accounts/${id}/principal/`, data),
+  // 投资收益管理：?book=husband 只看某个账本
+  returns: (params) => request('GET', '/accounts/returns/', params),
+  // 家庭总资产明细与净值曲线：首页资产卡下钻
+  netValue: () => request('GET', '/accounts/netvalue/'),
+
+  // 借贷
+  loans: (params) => request('GET', '/loans/', params),
+  createLoan: (data) => request('POST', '/loans/', data),
+  deleteLoan: (id) => request('DELETE', `/loans/${id}/`),
+  createRepayment: (id, data) => request('POST', `/loans/${id}/repayments/`, data),
+  deleteRepayment: (id) => request('DELETE', `/loans/repayments/${id}/`),
+
+  // 家庭
+  familyMe: () => request('GET', '/families/me/'),
+  invites: () => request('GET', '/families/invitations/'),
+  createInvite: (data) => request('POST', '/families/invitations/', data),
+  revokeInvite: (id) => request('DELETE', `/families/invitations/${id}/revoke/`),
+  updateMember: (id, data) => request('PATCH', `/families/members/${id}/`, data),
+  removeMember: (id) => request('DELETE', `/families/members/${id}/`),
+  transferOwner: (id) => request('POST', `/families/members/${id}/transfer-owner/`),
+  thresholds: () => request('GET', '/families/thresholds/'),
+  saveThresholds: (data) => request('PUT', '/families/thresholds/', data),
 
   // 账本
   categories: (kind) => request('GET', '/ledger/categories/', { kind }),

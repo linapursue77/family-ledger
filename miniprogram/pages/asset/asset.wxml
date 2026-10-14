@@ -1,0 +1,112 @@
+<view class="page">
+  <view wx:if="{{!loaded && loading}}" class="loading">加载中…</view>
+
+  <block wx:if="{{loaded}}">
+    <!-- 净值曲线 -->
+    <view class="card net-card">
+      <view class="card-title">📈 家庭资产净值曲线</view>
+      <view wx:if="{{hasTrend}}" class="bars">
+        <view wx:for="{{bars}}" wx:key="ym" class="bar-wrap">
+          <view class="bar" style="height: {{item.height}}"></view>
+          <text class="bar-label">{{item.label}}</text>
+        </view>
+      </view>
+      <view wx:else class="hint">历史快照不足，曲线将随每月快照积累逐步完善</view>
+      <view wx:if="{{pointCount}}" class="bar-tip">共 {{pointCount}} 个月快照 · 单位：元</view>
+    </view>
+
+    <!-- 资产构成 -->
+    <view class="section-title">💰 资产构成</view>
+    <view class="card compose">
+      <view class="donut-wrap">
+        <view wx:if="{{donutStyle}}" class="donut" style="{{donutStyle}}"></view>
+        <view class="donut-center">
+          <view class="donut-total">{{assetBaseText}}</view>
+          <view class="donut-label">总资产</view>
+        </view>
+      </view>
+      <view class="legend">
+        <view wx:for="{{legends}}" wx:key="name" class="legend-row">
+          <view class="dot" style="background: {{item.color}}"></view>
+          <text class="legend-name">{{item.name}}</text>
+          <text class="legend-amount">{{item.amountText}}</text>
+          <text class="legend-pct" style="color: {{item.color}}">{{item.pct}}%</text>
+        </view>
+        <view wx:if="{{!legends.length}}" class="hint">还没有有余额的账户</view>
+      </view>
+    </view>
+
+    <!-- 净资产：总资产扣掉借入未还 -->
+    <view wx:if="{{showNet}}" class="card net-line">
+      <view wx:for="{{netLines}}" wx:key="key" class="nl-row">
+        <text class="nl-label">{{item.icon}} {{item.label}}</text>
+        <text class="nl-value {{item.cls}}">{{item.text}}</text>
+      </view>
+      <view class="nl-row total">
+        <text class="nl-label">家庭净资产</text>
+        <text class="nl-value">{{netText}}</text>
+      </view>
+    </view>
+
+    <!-- 各账户详情：只列有数据的账本，合计为 0 的账本不占位置 -->
+    <block wx:if="{{groups.length}}">
+      <view class="section-title">📒 各账户详情</view>
+      <view wx:for="{{groups}}" wx:key="book_type" class="card group">
+        <view class="group-head">
+          <text class="group-name">{{item.icon}} {{item.label}}</text>
+          <text class="group-total">
+            {{item.totalText}}
+            <text wx:if="{{item.profitText}}" class="g-profit {{item.profitUp ? 'up' : 'down'}}">{{item.profitText}}</text>
+          </text>
+        </view>
+        <block wx:for="{{item.accounts}}" wx:for-item="a" wx:key="id">
+          <view class="acc-row">
+            <text class="acc-icon">{{a.icon}}</text>
+            <text class="acc-name">{{a.name}}<text wx:if="{{a.is_invest}}" class="acc-tag">收</text></text>
+            <text class="acc-balance">{{a.balanceText}}</text>
+          </view>
+          <view wx:if="{{a.profitText}}" class="acc-profit-line">
+            其中收益
+            <text class="{{a.profitUp ? 'up' : 'down'}}">{{a.profitText}}</text>
+            <text wx:if="{{a.rateText}}">，占该账户 {{a.rateText}}</text>
+          </view>
+        </block>
+      </view>
+    </block>
+
+    <!-- 借钱来往：应收 / 负债单独列一笔，避免只藏在环里看不出是谁欠的 -->
+    <view wx:if="{{loanSummary && (loanSummary.lend_cents || loanSummary.borrow_cents)}}" class="card group">
+      <view class="group-head" bindtap="goLoans">
+        <text class="group-name">🤝 借钱来往</text>
+        <text class="group-total link">查看台账 ›</text>
+      </view>
+      <view wx:if="{{loanSummary.lend_cents}}" class="acc-row">
+        <text class="acc-icon">📤</text>
+        <text class="acc-name">借出未收（{{loanSummary.lend_count}} 笔）</text>
+        <text class="acc-balance">{{lendText}}</text>
+      </view>
+      <view wx:if="{{loanSummary.borrow_cents}}" class="acc-row">
+        <text class="acc-icon">📥</text>
+        <text class="acc-name">借入未还（{{loanSummary.borrow_count}} 笔）</text>
+        <text class="acc-balance warn">{{borrowText}}</text>
+      </view>
+      <view wx:if="{{loanSummary.overdue_count}}" class="acc-empty danger">
+        ⚠️ 其中 {{loanSummary.overdue_count}} 笔已过约定还款日
+      </view>
+    </view>
+
+    <view wx:if="{{excluded.length}}" class="card group">
+      <view class="group-head">
+        <text class="group-name">🚫 不计入总资产</text>
+        <text class="group-total">{{excluded.length}} 个</text>
+      </view>
+      <view wx:for="{{excluded}}" wx:key="id" class="acc-row">
+        <text class="acc-icon">{{item.icon}}</text>
+        <text class="acc-name">{{item.name}}</text>
+        <text class="acc-balance muted">{{item.balanceText}}</text>
+      </view>
+    </view>
+
+    <view class="tip">💡 每月更新一次，记录家庭财富增长轨迹</view>
+  </block>
+</view>
