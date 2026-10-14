@@ -10,6 +10,7 @@ const emit = defineEmits(['close'])
 const router = useRouter()
 const RECV_COLOR = '#1D9E75'
 
+// 只用来兜底配色和图标；名称一律以服务器返回的为准（家庭可自定义账本名）
 const BOOK_META = {
   husband: { label: '账本一', icon: '🧾', color: '#1D9E75' },
   wife: { label: '账本二', icon: '🧾', color: '#E24B4A' },
@@ -25,6 +26,28 @@ let donutChart = null
 
 const metaOf = (book) => BOOK_META[book] || { label: book, icon: '📁', color: '#888780' }
 const colorOf = (book) => metaOf(book).color
+
+/** 家庭自定义后的账本名：netvalue 接口每次都带最新的 book_labels */
+const bookLabels = computed(() => data.value?.book_labels || {})
+
+/**
+ * 账本名称取值顺序：分组自带的 label → 顶层 book_labels → 内置默认名。
+ * ★ 不能直接用 BOOK_META：那样家庭改了名，这里永远显示旧的「账本一 / 账本二」。
+ */
+function groupLabel(g) {
+  return g?.label || bookLabels.value[g?.book_type] || metaOf(g?.book_type).label
+}
+
+/**
+ * 只展示「有数据」的账本：合计为 0 的账本（没开户 / 余额已清零）整组隐藏，
+ * 否则空账本会占掉一整块，把有内容的账本挤出可视区。
+ * 注意用 !== 0 而不是 > 0：信用卡等负余额账本是有数据的，必须保留。
+ */
+const visibleGroups = computed(() =>
+  (data.value?.groups || []).filter((g) => Number(g.total_cents) !== 0),
+)
+// 只有正数才能进构成环，负数段会让饼图变形
+const donutGroups = computed(() => visibleGroups.value.filter((g) => Number(g.total_cents) > 0))
 
 function money(cents) {
   const n = Number(cents || 0) / 100
@@ -142,10 +165,9 @@ function renderLine() {
 function renderDonut() {
   if (!donutEl.value || !data.value) return
   if (!donutChart) donutChart = echarts.init(donutEl.value)
-  const items = data.value.groups
-    .filter((g) => Number(g.total_cents) > 0)
+  const items = donutGroups.value
     .map((g) => ({
-      name: metaOf(g.book_type).label,
+      name: groupLabel(g),
       value: Number(g.total_cents) / 100,
       itemStyle: { color: colorOf(g.book_type) },
     }))
@@ -218,9 +240,9 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="compose-legend">
-            <div v-for="g in data.groups" :key="g.book_type" class="compose-row">
+            <div v-for="g in visibleGroups" :key="g.book_type" class="compose-row">
               <span class="compose-dot" :style="{ background: colorOf(g.book_type) }"></span>
-              <span class="compose-name">{{ metaOf(g.book_type).icon }} {{ metaOf(g.book_type).label }}</span>
+              <span class="compose-name">{{ metaOf(g.book_type).icon }} {{ groupLabel(g) }}</span>
               <span class="compose-amount">{{ money(g.total_cents) }}</span>
               <span
                 class="compose-pct"
@@ -235,6 +257,9 @@ onBeforeUnmount(() => {
                 class="compose-pct"
                 :style="{ background: RECV_COLOR + '22', color: RECV_COLOR }"
               >{{ pctOf(receivableCents) }}%</span>
+            </div>
+            <div v-if="!visibleGroups.length && receivableCents <= 0" class="compose-empty">
+              还没有有余额的账户
             </div>
           </div>
         </div>
@@ -255,42 +280,43 @@ onBeforeUnmount(() => {
           </span>
         </div>
 
-        <!-- 各账户详情 -->
-        <div class="section-title">📒 各账户详情</div>
-        <div v-for="g in data.groups" :key="g.book_type" class="group-card">
-          <div class="group-head">
-            <span>{{ metaOf(g.book_type).icon }} {{ metaOf(g.book_type).label }}</span>
-            <span class="group-total">
-              {{ money(g.total_cents) }}
-              <em
-                v-if="groupProfit(g)"
-                class="g-profit"
-                :class="groupProfit(g) > 0 ? 'p-up' : 'p-down'"
-              >{{ groupProfit(g) > 0 ? '+' : '-' }}¥{{ money(Math.abs(groupProfit(g)) / 100) }}</em>
-            </span>
-          </div>
-          <template v-for="a in g.accounts" :key="a.id">
-            <div class="acc-row">
-              <span class="acc-icon">{{ a.icon }}</span>
-              <span class="acc-name">
-                {{ a.name }}
-                <i v-if="a.is_invest" class="acc-tag">收</i>
+        <!-- 各账户详情：只列有数据的账本，合计为 0 的账本不占位置 -->
+        <template v-if="visibleGroups.length">
+          <div class="section-title">📒 各账户详情</div>
+          <div v-for="g in visibleGroups" :key="g.book_type" class="group-card">
+            <div class="group-head">
+              <span>{{ metaOf(g.book_type).icon }} {{ groupLabel(g) }}</span>
+              <span class="group-total">
+                {{ money(g.total_cents) }}
+                <em
+                  v-if="groupProfit(g)"
+                  class="g-profit"
+                  :class="groupProfit(g) > 0 ? 'p-up' : 'p-down'"
+                >{{ groupProfit(g) > 0 ? '+' : '-' }}¥{{ money(Math.abs(groupProfit(g)) / 100) }}</em>
               </span>
-              <span class="acc-balance">{{ money(a.balance_cents) }}</span>
             </div>
-            <!-- 纳入收益管理的账户：余额下面直接标出「其中收益」占多少 -->
-            <div v-if="a.is_invest && Number(a.profit_cents)" class="acc-profit-line">
-              其中收益
-              <em :class="a.profit_cents > 0 ? 'p-up' : 'p-down'">
-                {{ a.profit_cents > 0 ? '+' : '-' }}¥{{ money(Math.abs(a.profit_cents) / 100) }}
-              </em>
-              <template v-if="Number(a.balance_cents)">
-                ，占该账户 {{ ((a.profit_cents / a.balance_cents) * 100).toFixed(1) }}%
-              </template>
-            </div>
-          </template>
-          <div v-if="!g.accounts.length" class="acc-empty">暂无{{ metaOf(g.book_type).label }}</div>
-        </div>
+            <template v-for="a in g.accounts" :key="a.id">
+              <div class="acc-row">
+                <span class="acc-icon">{{ a.icon }}</span>
+                <span class="acc-name">
+                  {{ a.name }}
+                  <i v-if="a.is_invest" class="acc-tag">收</i>
+                </span>
+                <span class="acc-balance">{{ money(a.balance_cents) }}</span>
+              </div>
+              <!-- 纳入收益管理的账户：余额下面直接标出「其中收益」占多少 -->
+              <div v-if="a.is_invest && Number(a.profit_cents)" class="acc-profit-line">
+                其中收益
+                <em :class="a.profit_cents > 0 ? 'p-up' : 'p-down'">
+                  {{ a.profit_cents > 0 ? '+' : '-' }}¥{{ money(Math.abs(a.profit_cents) / 100) }}
+                </em>
+                <template v-if="Number(a.balance_cents)">
+                  ，占该账户 {{ ((a.profit_cents / a.balance_cents) * 100).toFixed(1) }}%
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
 
         <!-- 借出未收属于应收资产，单独列一笔，避免只藏在环里看不出是谁欠的 -->
         <div v-if="loanSum && (loanSum.lend_cents || loanSum.borrow_cents)" class="group-card">
@@ -517,6 +543,11 @@ onBeforeUnmount(() => {
   padding: 2px 6px;
   border-radius: 999px;
   font-variant-numeric: tabular-nums;
+}
+.compose-empty {
+  font-size: 12px;
+  color: #b0aeaa;
+  padding: 6px 0;
 }
 .group-card {
   border: 0.5px solid #e8e8e8;

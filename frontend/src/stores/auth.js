@@ -22,22 +22,22 @@ export const useAuthStore = defineStore('auth', {
     canRecord: (s) => (s.member?.permissions || {}).allow_record !== false,
   },
   actions: {
-    async login(payload) {
-      const d = await authApi.login(payload)
+    /** 落地登录结果：存 token 再拉家庭上下文。账号密码、微信登录共用 */
+    async applyLoginData(d) {
       this.token = d.token.access
       this.refresh = d.token.refresh || ''
       localStorage.setItem('fl_token', this.token)
       if (this.refresh) localStorage.setItem('fl_refresh', this.refresh)
       await this.fetchMe()
     },
+    async login(payload) {
+      const d = await authApi.login(payload)
+      await this.applyLoginData(d)
+    },
     /** 注册即登录：后端返回 token，存好后再拉一次家庭上下文 */
     async register(payload) {
       const d = await authApi.register(payload)
-      this.token = d.token.access
-      this.refresh = d.token.refresh || ''
-      localStorage.setItem('fl_token', this.token)
-      if (this.refresh) localStorage.setItem('fl_refresh', this.refresh)
-      await this.fetchMe()
+      await this.applyLoginData(d)
     },
     async fetchMe() {
       const d = await authApi.me()

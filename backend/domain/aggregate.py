@@ -36,18 +36,33 @@ def sum_amount(txs, tx_type: str) -> int:
     return sum(int(t.amount_cents) for t in txs if t.type == tx_type)
 
 
-def group_by_category(txs, tx_type: str = EXPENSE) -> list[dict]:
-    """按分类汇总，降序。"""
+def group_by_category(txs, tx_type: str = EXPENSE, category_meta: dict = None) -> list[dict]:
+    """按分类汇总，降序。
+
+    category_meta: 可选的 {category_id: {'name','icon','color'}}，
+                   不传则自动从 load_category_meta() 取（静态预设 + 数据库自定义）。
+    """
     buckets = defaultdict(int)
     for t in txs:
         if t.type != tx_type:
             continue
         buckets[t.category_id or 'other'] += int(t.amount_cents)
 
+    if not buckets:
+        return []
+
+    if category_meta is None:
+        # 延迟导入：避免 domain 层在 App 未就绪时触发 ORM 加载
+        from domain.category_meta import load_category_meta
+
+        category_meta = load_category_meta()
+
     total = sum(buckets.values())
     rows = []
     for category_id, amount in sorted(buckets.items(), key=lambda kv: kv[1], reverse=True):
-        meta = CATEGORY_MAP.get(category_id, {})
+        # ★ 自定义分类优先走数据库元信息，取不到再退回静态预设，
+        #   否则新增分类在报告里会显示成裸 ID（c1a2b3c4d5）
+        meta = category_meta.get(category_id) or CATEGORY_MAP.get(category_id, {})
         rows.append({
             'category_id': category_id,
             'name': meta.get('name', category_id),

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/api'
@@ -33,6 +33,11 @@ const forgotSending = ref(false)
 const forgotCountdown = ref(0)
 let countdownTimer = null
 
+// 微信一键登录（公众号网页授权）：只在微信内置浏览器里可用，且后端必须配了 appid / secret
+const isWechat = /micromessenger/i.test(navigator.userAgent || '')
+const wxEnabled = ref(false)
+const wxBusy = ref(false)
+
 const isRegister = computed(() => mode.value === 'register')
 const isForgot = computed(() => mode.value === 'forgot')
 
@@ -52,6 +57,60 @@ function stopCountdown() {
   }
 }
 onUnmounted(stopCountdown)
+
+/** 把地址栏里的授权参数抹掉：留着的话刷新一次就会拿已用掉的 ticket 报错 */
+function stripCallbackParams() {
+  const params = new URLSearchParams(window.location.search)
+  if (!params.has('mp_ticket') && !params.has('mp_error')) return null
+  const picked = { ticket: params.get('mp_ticket'), error: params.get('mp_error') }
+  params.delete('mp_ticket')
+  params.delete('mp_error')
+  const query = params.toString()
+  history.replaceState(
+    null,
+    '',
+    `${location.pathname}${query ? '?' + query : ''}${location.hash}`,
+  )
+  return picked
+}
+
+onMounted(async () => {
+  const cb = stripCallbackParams()
+  if (cb?.error) {
+    error.value = cb.error
+    return
+  }
+  if (cb?.ticket) {
+    // 授权回来：一次性 ticket 换 token，换完即登录
+    wxBusy.value = true
+    try {
+      const d = await authApi.wechatMpTicket(cb.ticket)
+      await auth.applyLoginData(d)
+      router.replace(route.query.redirect || '/')
+    } catch (e) {
+      error.value = e.message || '微信登录失败，请重试'
+    } finally {
+      wxBusy.value = false
+    }
+    return
+  }
+  if (!isWechat) return
+  try {
+    const d = await authApi.wechatMpConfig()
+    wxEnabled.value = !!d?.enabled
+  } catch {
+    wxEnabled.value = false
+  }
+})
+
+/** 跳公众号授权：授权完微信带 code 回后端，后端再跳回本站并带上一次性 ticket */
+function wechatLogin() {
+  const back = route.query.redirect
+    ? `/#/login?redirect=${encodeURIComponent(String(route.query.redirect))}`
+    : '/#/login'
+  wxBusy.value = true
+  window.location.href = authApi.wechatMpAuthorizeUrl(back)
+}
 
 async function sendCode() {
   if (!/^1[3-9]\d{9}$/.test(forgotPhone.value)) {
@@ -266,6 +325,17 @@ function onSubmit() {
       <p v-if="!isRegister" class="hint forgot-link" @click="switchMode('forgot')">
         忘记密码？
       </p>
+
+      <!-- 微信一键登录：公众号网页授权，仅在微信内打开且后端已配置时显示 -->
+      <template v-if="wxEnabled">
+        <div class="wx-entry">
+          <div class="divider"><span>或</span></div>
+          <button v-if="isWechat" class="btn btn-wechat" :disabled="wxBusy" @click="wechatLogin">
+            <span class="wx-icon">💬</span>{{ wxBusy ? '微信登录中…' : '微信一键登录' }}
+          </button>
+          <p v-else class="wx-tip">请在微信中打开本页，即可使用微信一键登录</p>
+        </div>
+      </template>
       </template>
       <p v-if="isRegister" class="note">
         注册后会自动建一个家庭，你就是主账号；之后可在「我的 → 主账号设置」里把它转让给对方。
@@ -406,6 +476,49 @@ function onSubmit() {
   font-size: 11px;
   color: var(--text-muted);
   margin-left: 6px;
+}
+/* 微信一键登录：分隔线 + 微信绿按钮 */
+.wx-entry {
+  margin-top: 24px;
+}
+.divider {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 18px;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.divider span {
+  padding: 0 12px;
+}
+.btn-wechat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: #07c160;
+  color: #fff;
+}
+.btn-wechat:disabled {
+  opacity: 0.6;
+}
+.wx-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+.wx-tip {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
 }
 
 </style>

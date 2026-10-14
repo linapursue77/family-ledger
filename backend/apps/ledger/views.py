@@ -61,6 +61,7 @@ from domain.aggregate import (
     period_trend,
     sum_amount,
 )
+from domain.category_meta import invalidate_category_meta
 from domain.classify import classify
 from domain.dedup import dedup_hash
 from domain.insight import analyze
@@ -135,6 +136,8 @@ class CategoryViewSet(mixins.CreateModelMixin,
             is_system=False,
             sort=max_sort + 1,
         )
+        # 让报告/首页的分类元信息立即读到新分类（否则最多等 5 分钟缓存）
+        invalidate_category_meta()
         return api_response(
             CategorySerializer(category).data,
             message='已新增分类',

@@ -49,5 +49,18 @@ def all_categories():
 
 
 def is_valid(category_id: str) -> bool:
-    """校验分类 ID 合法性（LLM 返回结果的兜底校验）。"""
-    return category_id in CATEGORY_MAP
+    """校验分类 ID 合法性（LLM / 用户规则的兜底校验）。
+
+    静态预设命中即返回；否则再查一次数据库元信息，
+    让用户自定义的分类也能被自动归类与账单导入接受。
+    """
+    if not category_id:
+        return False
+    if category_id in CATEGORY_MAP:
+        return True
+    try:
+        from domain.category_meta import load_category_meta
+
+        return category_id in load_category_meta()
+    except Exception:
+        return False

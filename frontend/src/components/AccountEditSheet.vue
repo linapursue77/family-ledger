@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed, reactive, watch } from 'vue'
 import { accountApi } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 import ConfirmSheet from '@/components/ConfirmSheet.vue'
 import { toast } from '@/utils/toast'
+
+const auth = useAuthStore()
 
 const props = defineProps({
   visible: Boolean,
@@ -24,6 +27,10 @@ const BOOK_OPTIONS = [
   { value: 'husband', label: '账本一', icon: '🧑' },
   { value: 'wife', label: '账本二', icon: '👤' },
 ]
+// ★ 家庭在「账户管理」里改过账本名后，这里必须跟着显示新名，否则选错账本
+const bookOptions = computed(() =>
+  BOOK_OPTIONS.map((b) => ({ ...b, label: auth.family?.book_labels?.[b.value] || b.label })),
+)
 
 const name = ref('')
 const cardType = ref('debit')
@@ -72,10 +79,11 @@ watch(
     visibility.value = a?.visibility || 'shared'
     balance.value = a ? String((Number(a.balance_cents) || 0) / 100) : ''
     isInvest.value = !!a?.is_invest
-    // 回填收益：收益 = 本金 − 现值（本金未录过则为 0）
+    // 回填收益：收益 = 现值 − 本金（本金未录过则留空，收益从 0 起算）
+    // 注意方向别写反：存的是本金、显示的是收益，反了会让每次编辑把收益变号
     profitInput.value =
       a && a.is_invest && Number(a.principal_cents) > 0
-        ? String((Number(a.principal_cents) - Number(a.balance_cents)) / 100)
+        ? String((Number(a.balance_cents) - Number(a.principal_cents)) / 100)
         : ''
   }
 )
@@ -208,7 +216,7 @@ async function onDelete() {
           <label class="fld-label">账户归属</label>
           <div class="chip-row">
             <div
-              v-for="b in BOOK_OPTIONS"
+              v-for="b in bookOptions"
               :key="b.value"
               class="chip"
               :class="{ on: bookType === b.value }"

@@ -13,6 +13,10 @@ from apps.users.views import (
     WechatAuthorizeView,
     WechatCallbackView,
     WechatLoginView,
+    WechatMpCallbackView,
+    WechatMpConfigView,
+    WechatMpLoginView,
+    WechatMpTicketView,
     WechatOpenidView,
 )
 
@@ -32,4 +36,9 @@ urlpatterns = [
     path('wechat/openid/', WechatOpenidView.as_view(), name='auth-wechat-openid'),
     path('wechat/authorize/', WechatAuthorizeView.as_view(), name='auth-wechat-authorize'),
     path('wechat/callback/', WechatCallbackView.as_view(), name='auth-wechat-callback'),
+    # 公众号网页授权登录（H5 端「微信一键登录」）：登录态不是前提，授权回来直接发 token
+    path('wechat/mp/config/', WechatMpConfigView.as_view(), name='auth-wechat-mp-config'),
+    path('wechat/mp/authorize/', WechatMpLoginView.as_view(), name='auth-wechat-mp-authorize'),
+    path('wechat/mp/callback/', WechatMpCallbackView.as_view(), name='auth-wechat-mp-callback'),
+    path('wechat/mp/ticket/', WechatMpTicketView.as_view(), name='auth-wechat-mp-ticket'),
 ]

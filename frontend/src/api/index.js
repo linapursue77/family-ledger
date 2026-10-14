@@ -32,6 +32,13 @@ function unwrap(promise) {
 
 export const authApi = {
   login: (payload) => unwrap(client.post('/auth/login/', payload)),
+  // 公众号网页授权登录是否可用：后端没配 appid / secret 会返回 enabled=false，前端据此隐藏按钮
+  wechatMpConfig: () => unwrap(client.get('/auth/wechat/mp/config/')),
+  // 授权回来的一次性 ticket 换 token。token 不落 URL，避免经 Referer / 历史记录泄漏
+  wechatMpTicket: (ticket) => unwrap(client.post('/auth/wechat/mp/ticket/', { ticket })),
+  // 发起微信登录：直接跳后端授权入口，next 是授权完要回到的本站路径（可带 hash）
+  wechatMpAuthorizeUrl: (next = '/') =>
+    `/api/v1/auth/wechat/mp/authorize/?next=${encodeURIComponent(next)}`,
   // 注册：后端会自动建一个新家庭并把注册人设为主账号，返回 token 直接进首页
   register: (payload) => unwrap(client.post('/auth/register/', payload)),
   me: () => unwrap(client.get('/auth/me/')),

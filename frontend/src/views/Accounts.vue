@@ -121,6 +121,9 @@ async function saveRename() {
   try {
     await accountApi.renameBook({ book_type: renameBookType.value, label })
     showRename.value = false
+    // ★ 账本名是家庭级配置，记账页、账户编辑弹层都读 auth.family，
+    //   不刷新的话只有本页变了，别处仍显示旧名。
+    await auth.fetchMe()
     await load()
   } catch (e) {
     toast(e.message || '保存失败')
