@@ -58,6 +58,11 @@
     </view>
   </block>
 
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    <view class="login-lock">🔒</view>
+    <view class="login-text">登录后查看收支报告与趋势分析</view>
+    <button class="login-btn" bindtap="goLogin">立即登录</button>
+  </view>
   <view wx:elif="{{loading}}" class="empty">加载中…</view>
   <view wx:else class="empty">暂无数据</view>
 </view>

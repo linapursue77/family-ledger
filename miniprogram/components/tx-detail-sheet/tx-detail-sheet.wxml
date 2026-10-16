@@ -1,0 +1,62 @@
+<view wx:if="{{visible}}" class="mask" bindtap="onClose" catchtouchmove="noop">
+  <view class="sheet" catchtap="noop">
+    <view class="sheet-head">
+      <text class="sheet-title">账单详情</text>
+      <text class="sheet-close" bindtap="onClose">✕</text>
+    </view>
+
+    <view wx:if="{{loading}}" class="sheet-loading">加载中…</view>
+
+    <block wx:elif="{{detail}}">
+      <!-- 金额头 -->
+      <view class="hero">
+        <view class="hero-icon">{{detail.categoryIcon}}</view>
+        <view class="hero-amount {{detail.isIn ? 'in' : 'out'}}">{{detail.amountText}}</view>
+        <view class="hero-type">{{detail.typeText}}</view>
+      </view>
+
+      <view class="kv-list">
+        <view class="kv">
+          <text class="kv-k">分类</text>
+          <text class="kv-v">{{detail.categoryText}}</text>
+        </view>
+        <view class="kv">
+          <text class="kv-k">账户</text>
+          <text class="kv-v">{{detail.accountText}}</text>
+        </view>
+        <view class="kv">
+          <text class="kv-k">商户</text>
+          <text class="kv-v">{{detail.merchantText}}</text>
+        </view>
+        <view class="kv">
+          <text class="kv-k">备注</text>
+          <text class="kv-v">{{detail.descText}}</text>
+        </view>
+        <view class="kv">
+          <text class="kv-k">时间</text>
+          <text class="kv-v">{{detail.dateText}}</text>
+        </view>
+        <view class="kv">
+          <text class="kv-k">私密消费</text>
+          <text class="kv-v">{{detail.privateText}}</text>
+        </view>
+        <view wx:if="{{detail.user_name}}" class="kv">
+          <text class="kv-k">记录人</text>
+          <text class="kv-v">{{detail.user_name}}</text>
+        </view>
+      </view>
+
+      <!-- 借贷流水只能在借钱来往里改 -->
+      <view wx:if="{{detail.isLoan}}" class="loan-tip">
+        这是借钱来往生成的记录，请到「借钱来往」里修改或删除
+      </view>
+
+      <view wx:else class="actions">
+        <view class="act-btn edit" bindtap="onEdit">编辑</view>
+        <view class="act-btn del {{deleting ? 'disabled' : ''}}" bindtap="onDelete">
+          {{deleting ? '删除中…' : '删除'}}
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

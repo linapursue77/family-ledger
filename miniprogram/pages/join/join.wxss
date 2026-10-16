@@ -1,0 +1,96 @@
+.join-page {
+  padding: 48rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.j-card {
+  width: 100%;
+  padding: 40rpx 32rpx 28rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+.j-icon {
+  font-size: 64rpx;
+  margin-bottom: 14rpx;
+}
+.j-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.j-family {
+  margin-top: 10rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.j-desc {
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  color: var(--text-sub);
+  line-height: 1.7;
+}
+.j-meta {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: var(--text-muted);
+}
+.j-sec {
+  margin: 28rpx 0 12rpx;
+  text-align: left;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.j-perms {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+.j-perm {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  text-align: left;
+  font-size: 26rpx;
+  color: var(--text-body);
+  background: #f7f6f2;
+  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+}
+.j-dot {
+  flex: none;
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.j-note {
+  margin: 16rpx 0 24rpx;
+  text-align: left;
+  font-size: 24rpx;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.j-decline {
+  margin-top: 16rpx;
+  padding: 22rpx 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 30rpx;
+  border-radius: 16rpx;
+}
+.j-decline::after {
+  border: none;
+}
+.j-empty {
+  padding: 80rpx 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 26rpx;
+}
+.j-card .btn,
+.j-card .btn-primary {
+  margin-top: 12rpx;
+}

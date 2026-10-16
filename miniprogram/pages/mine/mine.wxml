@@ -1,19 +1,21 @@
 <view class="page">
-  <!-- 用户卡 -->
-  <view class="card user-card">
-    <view class="avatar">{{user.nickname ? user.nickname[0] : '财'}}</view>
+  <!-- 用户卡：未登录时整卡可点，作为登录入口 -->
+  <view class="card user-card" bindtap="onUserTap">
+    <view class="avatar">{{isLoggedIn ? (user.nickname ? user.nickname[0] : '财') : '👤'}}</view>
     <view class="user-info">
-      <text class="user-name">{{user.nickname || '未设置昵称'}}</text>
-      <text class="user-family text-muted">{{family.name || '我的家庭'}}</text>
+      <text class="user-name">{{isLoggedIn ? (user.nickname || '未设置昵称') : '点击登录'}}</text>
+      <text class="user-family text-muted">{{isLoggedIn ? (family.name || '我的家庭') : '登录后同步家庭账本'}}</text>
     </view>
+    <text wx:if="{{!isLoggedIn}}" class="arrow">›</text>
   </view>
 
   <!-- 账户列表 -->
   <view class="card section">
     <view class="section-head">
       <text class="section-title">我的账户</text>
-      <text class="add-btn" bindtap="openAdd">＋ 新增</text>
+      <text wx:if="{{isLoggedIn}}" class="add-btn" bindtap="openAdd">＋ 新增</text>
     </view>
+    <block wx:if="{{isLoggedIn}}">
     <view class="list-item" wx:for="{{accounts}}" wx:key="id">
       <text class="acc-icon">{{item.icon}}</text>
       <view class="acc-info">
@@ -23,6 +25,8 @@
       <text class="acc-balance">¥{{item.balanceText}}</text>
     </view>
     <view wx:if="{{!accounts.length}}" class="empty">暂无账户，点击右上角新增</view>
+    </block>
+    <view wx:else class="empty">登录后查看我的账户</view>
   </view>
 
   <!-- 更多功能 -->
@@ -37,7 +41,7 @@
     </view>
     <view class="list-item" bindtap="goLoans">
       <text class="acc-icon">🤝</text>
-      <text class="acc-name">借出借入</text>
+      <text class="acc-name">借钱来往</text>
       <text class="arrow">›</text>
     </view>
     <view class="list-item" bindtap="goReturns">
@@ -45,15 +49,34 @@
       <text class="acc-name">收益管理</text>
       <text class="arrow">›</text>
     </view>
+    <!-- 定时记账：与 H5 入口同名同位置 -->
+    <view class="list-item" bindtap="goRecurring">
+      <text class="acc-icon">⏰</text>
+      <text class="acc-name">定时记账</text>
+      <text class="item-value">{{recText}}</text>
+      <text class="arrow">›</text>
+    </view>
     <view class="list-item" bindtap="goFamily">
       <text class="acc-icon">🏠</text>
       <text class="acc-name">家庭管理</text>
       <text class="arrow">›</text>
     </view>
+    <view class="list-item" bindtap="goImport">
+      <text class="acc-icon">📥</text>
+      <text class="acc-name">账单导入</text>
+      <text class="arrow">›</text>
+    </view>
+    <!-- 分享给好友：必须真 button，微信只认 open-type="share" 拉起会话面板。
+         与主包/-pc2 的 H5「分享给好友」入口同名同位置 -->
+    <button class="list-item share-item" open-type="share" hover-class="share-hover">
+      <text class="acc-icon">📢</text>
+      <text class="acc-name">分享给好友</text>
+      <text class="arrow">›</text>
+    </button>
   </view>
 
-  <!-- 登录密码：微信一键登录的账号默认没有密码，设置后可在网页版登录 -->
-  <view class="card section">
+  <!-- 登录密码：微信一键登录的账号默认没有密码，设置后可在网页版登录（仅登录后展示） -->
+  <view wx:if="{{isLoggedIn}}" class="card section">
     <view class="section-head" bindtap="openPwd">
       <text class="section-title">🔑 {{pwdTitle}}</text>
       <text class="add-btn">{{pwdText}}</text>
@@ -78,9 +101,10 @@
     </view>
   </view>
 
-  <view class="logout-area">
+  <view wx:if="{{isLoggedIn}}" class="logout-area">
     <button class="btn-logout" bindtap="onLogout">退出登录</button>
   </view>
+  <view wx:else class="guest-tip">先随便逛逛，数据都在登录后等你 👋</view>
 
   <!-- 新增账户弹窗 -->
   <view wx:if="{{showAdd}}" class="sheet-mask" bindtap="closeAdd">

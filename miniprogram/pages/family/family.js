@@ -1,5 +1,7 @@
 const api = require('../../utils/api')
+const { requireLogin } = require('../../utils/request')
 const { yuan } = require('../../utils/money')
+const { appPayload, invitePayload, toAppMessage, toTimeline } = require('../../utils/share')
 
 const BOOKS = [
   { value: 'husband', label: '账本一' },
@@ -41,8 +43,19 @@ Page({
     th: { small: '', notify: '', approve: '' },
   },
 
+  // 分享载荷：平时是应用分享，生成邀请后临时替换成邀请卡片
+  _sharePayload: null,
+
   onShow() {
     this.load()
+  },
+
+  // ---- 分享：右上角菜单与 token 框里的按钮都走这里
+  onShareAppMessage() {
+    return toAppMessage(this._sharePayload || appPayload())
+  },
+  onShareTimeline() {
+    return toTimeline(this._sharePayload || appPayload())
   },
 
   async load() {
@@ -84,6 +97,11 @@ Page({
         },
       })
     } catch (e) {
+      if (requireLogin(e)) {
+        // 未登录进不了本页：提示后回上一页（各 tab 首页已有登录引导）
+        wx.navigateBack({ delta: 1 })
+        return
+      }
       wx.showToast({ title: e.message || '加载失败', icon: 'none' })
     } finally {
       this.setData({ loading: false })
@@ -103,9 +121,12 @@ Page({
   // ---- 邀请
   openInvite() {
     this.setData({ showInvite: true, inviteNickname: '', inviteContact: '', newToken: '' })
+    this._sharePayload = null
   },
   closeInvite() {
     this.setData({ showInvite: false })
+    // 邀请框关掉后，右上角分享恢复成「分享应用」
+    this._sharePayload = null
   },
   onInviteNickname(e) {
     this.setData({ inviteNickname: e.detail.value })
@@ -124,7 +145,13 @@ Page({
         contact: (this.data.inviteContact || '').trim(),
       })
       // token 只在生成这一刻返回一次，之后列表里查不到
-      this.setData({ newToken: res.token || '' })
+      const token = res.token || ''
+      this.setData({ newToken: token })
+      // 有 token 时把分享对象换成邀请卡片，对方点开直落 join 页
+      const owner = (this.data.members || []).find((m) => m.role === 'owner')
+      this._sharePayload = token
+        ? invitePayload(token, (owner && (owner.display || owner.nickname)) || '')
+        : null
       await this.load()
     } catch (e) {
       wx.showToast({ title: e.message || '生成失败', icon: 'none' })

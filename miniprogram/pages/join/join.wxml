@@ -1,0 +1,41 @@
+<view class="page join-page">
+  <view wx:if="{{loading}}" class="j-empty">正在读取邀请…</view>
+
+  <!-- 未登录：先把 token 存到 globalData，登录页登录后自动跳回来 -->
+  <view wx:elif="{{!isLoggedIn}}" class="card j-card">
+    <view class="j-icon">🔑</view>
+    <view class="j-title">需要登录后接受邀请</view>
+    <view class="j-desc">登录后即可查看邀请详情并加入家庭。</view>
+    <button class="btn-primary" bindtap="goLogin">去登录</button>
+    <button class="btn j-decline" bindtap="goHome">返回首页</button>
+  </view>
+
+  <view wx:elif="{{errorText}}" class="card j-card">
+    <view class="j-icon">⚠️</view>
+    <view class="j-title">无法加入</view>
+    <view class="j-desc">{{errorText}}</view>
+    <button class="btn-primary" bindtap="goHome">返回首页</button>
+  </view>
+
+  <view wx:elif="{{info}}" class="card j-card">
+    <view class="j-icon">👨‍👩‍👧</view>
+    <view class="j-title">{{info.inviter}} 邀请你加入</view>
+    <view class="j-family">「{{info.family_name}}」</view>
+    <view class="j-meta">
+      {{expireText}} 前有效 · 当前 {{info.member_count}}/{{info.member_limit}} 位成员
+    </view>
+
+    <view class="j-sec">加入后你可以</view>
+    <view class="j-perms">
+      <view wx:for="{{permList}}" wx:key="*this" class="j-perm">
+        <text class="j-dot"></text>{{item}}
+      </view>
+    </view>
+    <view class="j-note">权限可在家庭管理中随时调整；加入后你的账单会记在独立账本里。</view>
+
+    <button class="btn-primary" disabled="{{submitting}}" bindtap="onAccept">
+      {{submitting ? '加入中…' : '接受邀请并加入'}}
+    </button>
+    <button class="btn j-decline" bindtap="goHome">暂不加入</button>
+  </view>
+</view>

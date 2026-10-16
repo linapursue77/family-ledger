@@ -27,6 +27,13 @@ frontend/.vite/
 .vite/
 .DS_Store
 
+# ---- 微信开发者工具（每台机器不同，勿入库）----
+project.private.config.json
+miniprogram/project.private.config.json
+
+# 调试 tabBar 图标时生成的探针图，非最终资源
+miniprogram/assets/tabbar/*-v2.png
+
 # ---- 部署打包产物 ----
 family-ledger-deploy.tar.gz
 

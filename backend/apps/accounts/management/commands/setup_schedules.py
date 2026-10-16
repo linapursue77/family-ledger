@@ -16,6 +16,12 @@ SCHEDULES = [
         Schedule.DAILY,
         '资产净值曲线的数据源；每天刷新当月快照，月底定格',
     ),
+    (
+        '每日周期记账',
+        'apps.ledger.tasks.run_recurring_rules',
+        Schedule.DAILY,
+        '按时把启用的周期记账规则生成流水并入账（房租、通勤等固定收支）',
+    ),
 ]
 
 

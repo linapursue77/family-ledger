@@ -96,8 +96,12 @@
       <view wx:if="{{newToken}}" class="token-box">
         <text class="token-label">邀请码（7 天内有效，只显示这一次）</text>
         <text class="token-value" user-select>{{newToken}}</text>
+        <!-- 分享给微信好友：发出去是小程序卡片，对方点开直接进 join 页 -->
+        <button class="btn-primary share-btn" open-type="share">
+          分享给微信好友
+        </button>
         <view class="token-copy" bindtap="copyToken">复制邀请码</view>
-        <view class="form-note">把邀请码发给对方，在网页版「加入家庭」里填入即可。</view>
+        <view class="form-note">也可以复制链接或邀请码给对方，在网页版「加入家庭」里填入。</view>
       </view>
     </view>
   </view>

@@ -162,6 +162,16 @@ export const membershipApi = {
   bindOpenid: (code) => unwrap(client.post('/auth/wechat/openid/', { code })),
 }
 
+export const recurringApi = {
+  // 周期记账（定时记账）：规则增删改查 + 立即执行
+  list: () => unwrap(client.get('/ledger/recurring/')),
+  create: (payload) => unwrap(client.post('/ledger/recurring/', payload)),
+  update: (id, payload) => unwrap(client.patch(`/ledger/recurring/${id}/`, payload)),
+  remove: (id) => unwrap(client.delete(`/ledger/recurring/${id}/`)),
+  run: (id) => unwrap(client.post(`/ledger/recurring/${id}/run/`, {})),
+  runDue: () => unwrap(client.post('/ledger/recurring/run_due/', {})),
+}
+
 export const importApi = {
   upload: (formData) =>
     unwrap(

@@ -9,6 +9,7 @@ from apps.ledger.views import (
     ImportTaskViewSet,
     MerchantHistoryView,
     OverviewView,
+    RecurringRuleViewSet,
     ReportInsightView,
     ReportView,
     TransactionViewSet,
@@ -18,6 +19,7 @@ router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'imports', ImportTaskViewSet, basename='import-task')
+router.register(r'recurring', RecurringRuleViewSet, basename='recurring-rule')
 
 urlpatterns = [
     path('overview/', OverviewView.as_view(), name='ledger-overview'),

@@ -70,6 +70,32 @@
   font-weight: 700;
   font-size: 30rpx;
 }
+.item-value {
+  font-size: 26rpx;
+  color: var(--text-muted);
+  margin-left: auto;
+  padding-right: 16rpx;
+}
+/* 分享入口必须是真 button（open-type="share"），这里把 button 默认样式清掉，
+   让它跟其它 view 列表项长得一模一样 */
+.share-item {
+  width: 100%;
+  margin: 0;
+  padding: 24rpx 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  line-height: normal;
+  text-align: left;
+  font-size: 30rpx;
+  color: var(--text-main);
+}
+.share-item::after {
+  border: none;
+}
+.share-hover {
+  background: #f6f5f1;
+}
 .pwd-form {
   padding: 8rpx 0 4rpx;
 }
@@ -110,4 +136,15 @@
   text-align: right;
   flex: 1;
   margin-left: 24rpx;
+}
+/* 未登录态 */
+.user-card .arrow {
+  font-size: 40rpx;
+  color: #c8c6c0;
+}
+.guest-tip {
+  text-align: center;
+  font-size: 24rpx;
+  color: #b0aeaa;
+  padding: 24rpx 0 48rpx;
 }

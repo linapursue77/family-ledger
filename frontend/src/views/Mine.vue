@@ -9,10 +9,12 @@ import {
   ledgerApi,
   loanApi,
   membershipApi,
+  recurringApi,
 } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { VIP_ENABLED } from '@/utils/flags'
 import { yuan } from '@/utils/money'
+import { appSharePayload, share } from '@/utils/share'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -170,6 +172,13 @@ const loanText = computed(() => {
   if (s.lend_cents) parts.push(`借出 ¥${Math.round(s.lend_cents / 100)}`)
   if (s.borrow_cents) parts.push(`借入 ¥${Math.round(s.borrow_cents / 100)}`)
   return parts.join(' · ')
+})
+
+// 定时记账：菜单显示启用中的规则数，没有规则时留空
+const recSummary = ref(null)
+const recText = computed(() => {
+  const n = Number(recSummary.value?.active_count || 0)
+  return n ? `${n} 条运行中` : ''
 })
 
 // 会员：菜单显示到期/试用状态
@@ -377,9 +386,27 @@ function onLogout() {
   router.push('/login')
 }
 
+// —— 分享：H5 在微信里不能自定义卡片，降级为「引导点右上角」，由 share() 返回 guide 决定 ——
+const showShareGuide = ref(false)
+async function handleShare() {
+  const r = await share(appSharePayload())
+  if (r === 'guide') showShareGuide.value = true
+}
+
+// 定时记账：只要启用中的条数，失败就留空，不影响「我的」页其它数据
+async function loadRecurring() {
+  try {
+    const list = await recurringApi.list()
+    recSummary.value = { active_count: (list || []).filter((r) => r.is_active).length }
+  } catch (e) {
+    recSummary.value = null
+  }
+}
+
 onMounted(() => {
   load()
   loadAi()
+  loadRecurring()
 })
 </script>
 
@@ -546,6 +573,13 @@ onMounted(() => {
         <span class="menu-value">{{ retText || '未开启' }}</span>
         <span class="menu-arrow">›</span>
       </div>
+      <!-- 定时记账：菜单上直接显示启用中的规则数 -->
+      <div class="menu-item" @click="router.push('/recurring')">
+        <span class="menu-icon">⏰</span>
+        <span class="menu-text">定时记账</span>
+        <span class="menu-value">{{ recText }}</span>
+        <span class="menu-arrow">›</span>
+      </div>
     </div>
 
     <!-- 家庭管理 -->
@@ -575,6 +609,12 @@ onMounted(() => {
     <!-- 其他 -->
     <div class="menu-section">
       <div class="menu-title">其他</div>
+      <!-- 分享给好友：优先调系统分享面板（可直接选微信），微信内则引导点右上角 -->
+      <div class="menu-item" @click="handleShare">
+        <span class="menu-icon">📢</span>
+        <span class="menu-text">分享给好友</span>
+        <span class="menu-arrow">›</span>
+      </div>
       <div class="menu-item" @click="router.push('/import')">
         <span class="menu-icon">📥</span>
         <span class="menu-text">账单导入</span>
@@ -671,6 +711,17 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- 微信内分享引导：自定义卡片要认证服务号，这里如实引导点右上角 -->
+    <div v-if="showShareGuide" class="share-guide" @click="showShareGuide = false">
+      <div class="sg-box" @click.stop>
+        <div class="sg-arrow">↗</div>
+        <div class="sg-title">点击右上角 ⋯ 分享</div>
+        <div class="sg-step">
+          自定义分享卡片需要已认证的公众号，当前还没有接。你可以在弹出菜单里选「发送给朋友」或「分享到朋友圈」。
+        </div>
+        <div class="sg-ok" @click="showShareGuide = false">知道了</div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -757,6 +808,52 @@ onMounted(() => {
 .menu-item:last-child {
   border-bottom: none;
 }
+
+/* 微信内分享引导遮罩 */
+.share-guide {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.sg-box {
+  width: 82%;
+  max-width: 320px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px 20px 16px;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+.sg-arrow {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 6px;
+  text-align: right;
+  color: #26215c;
+}
+.sg-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.sg-step {
+  font-size: 13px;
+  color: #888;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.sg-ok {
+  padding: 10px 0;
+  border-radius: 8px;
+  background: #26215c;
+  color: #fff;
+  font-size: 14px;
+}
+
 .menu-icon {
   font-size: 18px;
 }

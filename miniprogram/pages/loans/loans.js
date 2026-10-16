@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const { requireLogin } = require('../../utils/request')
 const { yuan } = require('../../utils/money')
 
 const DIRECTIONS = [
@@ -97,6 +98,11 @@ Page({
         },
       })
     } catch (e) {
+      if (requireLogin(e)) {
+        // 未登录进不了本页：提示后回上一页（各 tab 首页已有登录引导）
+        wx.navigateBack({ delta: 1 })
+        return
+      }
       wx.showToast({ title: e.message || '加载失败', icon: 'none' })
     } finally {
       this.setData({ loading: false })
@@ -178,6 +184,11 @@ Page({
   openRepay(e) {
     const loan = this.data.items.find((i) => i.id === e.currentTarget.dataset.id)
     if (!loan) return
+    // 已还清的借贷没有可还的钱，入口也不会展示，这里兜底拦截
+    if (loan.status === 'settled' || loan.remaining_cents <= 0) {
+      wx.showToast({ title: '这笔已还清', icon: 'none' })
+      return
+    }
     this.setData({
       showRepay: true,
       current: loan,

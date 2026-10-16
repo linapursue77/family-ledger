@@ -76,3 +76,26 @@
   font-weight: 600;
   font-size: 28rpx;
 }
+/* 未登录引导（与首页一致） */
+.login-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0 60rpx;
+}
+.login-lock {
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+}
+.login-text {
+  font-size: 26rpx;
+  color: #888780;
+  margin-bottom: 32rpx;
+}
+.login-btn {
+  background: var(--primary);
+  color: #fff;
+  font-size: 28rpx;
+  padding: 8rpx 64rpx;
+  border-radius: 999rpx;
+}

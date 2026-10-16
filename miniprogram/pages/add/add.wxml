@@ -1,72 +1,167 @@
-<view class="page">
-  <!-- 类型切换 -->
-  <view class="type-switch">
+<view class="page add-form">
+  <!-- 编辑态：给个明确出处，避免用户以为在记新账 -->
+  <view wx:if="{{isEdit}}" class="edit-bar">
+    <text class="edit-tip">正在修改已记录的账单</text>
+    <text class="edit-cancel" bindtap="onCancel">取消</text>
+  </view>
+
+  <!-- 顶部类型条：支出 / 收入 / 借还，选中实色胶囊；右侧 ＋ 新增分类 -->
+  <view class="type-bar">
     <view
       wx:for="{{types}}"
       wx:key="key"
-      class="type-btn {{activeType === item.key ? 'active' : ''}}"
+      class="type-pill {{activeType === item.key ? 'active' : ''}}"
       data-key="{{item.key}}"
       bindtap="onType"
     >{{item.label}}</view>
+    <view class="bar-spacer"></view>
+    <view class="bar-add" bindtap="openAddCat">＋</view>
   </view>
 
-  <!-- 金额 -->
-  <view class="card amount-card">
-    <text class="amount-symbol">{{activeType === 'expense' ? '-' : '+'}}</text>
+  <!-- 分类网格：5 列大图标 -->
+  <view class="category-grid">
+    <view
+      wx:for="{{categories}}"
+      wx:key="id"
+      class="category-cell {{categoryId === item.id ? 'active' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onCategory"
+    >
+      <text class="cat-icon">{{item.icon}}</text>
+      <text class="cat-name">{{item.name}}</text>
+    </view>
+  </view>
+
+  <!-- 金额 · 日期：同一张卡，视觉权重一致 -->
+  <view class="amount-note-card">
+    <view class="an-main">
+      <text class="an-label">金额</text>
+      <view class="an-amount">
+        <text class="amount-symbol">¥</text>
+        <input
+          class="amount-input"
+          type="digit"
+          value="{{amount}}"
+          placeholder="0.00"
+          bindinput="onAmount"
+        />
+      </view>
+      <view class="an-sep"></view>
+      <view class="an-date {{showDatePanel ? 'on' : ''}}" bindtap="toggleDatePanel">📅 {{shortDate}}</view>
+    </view>
+  </view>
+
+  <!-- 备注：独立一栏，下面挂该分类的历史记录 -->
+  <view class="form-group note-group">
+    <text class="form-label">备注</text>
     <input
-      class="amount-input"
-      type="digit"
-      placeholder="0.00"
-      value="{{amount}}"
-      bindinput="onAmount"
+      class="form-input"
+      value="{{merchant}}"
+      placeholder="添加备注..."
+      bindinput="onMerchant"
     />
-    <text class="amount-unit">元</text>
+    <view wx:if="{{merchantHistory.length}}" class="history-row">
+      <text
+        wx:for="{{merchantHistory}}"
+        wx:key="*this"
+        class="history-chip {{merchant === item ? 'on' : ''}}"
+        data-val="{{item}}"
+        bindtap="pickMerchant"
+      >{{item}}</text>
+    </view>
   </view>
 
-  <!-- 分类网格 -->
-  <view class="card section">
-    <view class="section-title">选择分类</view>
-    <view class="cat-grid">
+  <!-- 自绘日历：位置跟随 H5（金额卡 → 备注 → 日历），可改到过去任意一天，不允许选未来 -->
+  <view wx:if="{{showDatePanel}}" class="date-panel">
+    <view class="dp-head">
+      <view class="dp-nav" bindtap="prevMonth">‹</view>
+      <text class="dp-title">{{viewTitle}}</text>
+      <view class="dp-nav {{nextDisabled ? 'off' : ''}}" bindtap="nextMonth">›</view>
+    </view>
+    <view class="dp-week">
+      <text wx:for="{{week}}" wx:key="*this">{{item}}</text>
+    </view>
+    <view class="dp-grid">
       <view
-        wx:for="{{categories}}"
-        wx:key="id"
-        class="cat-cell {{categoryId === item.id ? 'selected' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onCategory"
-      >
-        <view class="cat-icon" style="background: {{item.color}}22">{{item.icon}}</view>
-        <text class="cat-label">{{item.name}}</text>
+        wx:for="{{calendarDays}}"
+        wx:key="key"
+        class="dp-cell {{item.muted ? 'muted' : ''}} {{item.date === txDate ? 'on' : ''}} {{item.off ? 'off' : ''}} {{item.isToday ? 'today' : ''}}"
+        data-date="{{item.date}}"
+        bindtap="pickDate"
+      >{{item.day}}</view>
+    </view>
+    <view class="dp-foot">
+      <text class="dp-btn" bindtap="closeDatePanel">收起</text>
+      <text class="dp-btn primary" bindtap="pickToday">回到今天</text>
+    </view>
+  </view>
+
+  <!-- 账本：只展示家庭里真实建过的账本；隐私只对支出生效 -->
+  <view class="quick-bar">
+    <view
+      wx:for="{{existingBooks}}"
+      wx:key="type"
+      class="q-chip {{bookType === item.type ? 'on' : ''}}"
+      data-type="{{item.type}}"
+      bindtap="onBook"
+    >📒 {{item.name}}<text wx:if="{{item.mine}}" class="q-tag">我的</text></view>
+    <view class="q-chip {{isPrivate ? 'on' : ''}}" bindtap="togglePrivate">
+      🙈 {{isPrivate ? '不计入共同支出' : '计入共同支出'}}
+    </view>
+  </view>
+
+  <!-- 账户：横向 chips，选中高亮 -->
+  <view class="account-bar">
+    <view
+      wx:for="{{visibleAccounts}}"
+      wx:key="id"
+      class="q-chip acct {{accountId === item.id ? 'on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onAccountPick"
+    >{{item.icon}} {{item.name}}</view>
+    <view wx:if="{{!visibleAccounts.length}}" class="q-chip">💳 这本账下还没有账户</view>
+  </view>
+
+  <!-- 按钮 -->
+  <view class="form-actions">
+    <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSave">
+      {{saving ? '保存中…' : (isEdit ? '保存修改' : '保存')}}
+    </button>
+    <button class="btn-secondary" bindtap="onCancel">取消</button>
+  </view>
+
+  <!-- 新增分类：底部弹层 -->
+  <view wx:if="{{showAddCat}}" class="sheet-mask" bindtap="closeAddCat">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">新增分类</text>
+        <text class="sheet-close" bindtap="closeAddCat">✕</text>
+      </view>
+      <text class="form-label">图标</text>
+      <view class="icon-picker">
+        <view
+          wx:for="{{catIcons}}"
+          wx:key="*this"
+          class="icon-opt {{newCatIcon === item ? 'on' : ''}}"
+          data-icon="{{item}}"
+          bindtap="pickCatIcon"
+        >{{item}}</view>
+      </view>
+      <text class="form-label cat-label">名称</text>
+      <input
+        class="form-input"
+        value="{{newCatName}}"
+        maxlength="10"
+        placeholder="如：宠物、健身、车位"
+        bindinput="onCatName"
+      />
+      <view class="cat-hint">将归到「{{activeType === 'income' ? '收入' : '支出'}}」分类下，新增后所有家庭成员都能用</view>
+      <view class="form-actions">
+        <button class="btn-primary {{catSaving ? 'disabled' : ''}}" bindtap="submitCat">
+          {{catSaving ? '保存中…' : '保存'}}
+        </button>
+        <button class="btn-secondary" bindtap="closeAddCat">取消</button>
       </view>
     </view>
-  </view>
-
-  <!-- 明细 -->
-  <view class="card section">
-    <view class="field-row">
-      <text class="field-label">账户</text>
-      <picker range="{{accounts}}" range-key="name" value="{{accountIndex}}" bindchange="onAccount">
-        <view class="field-value">
-          {{accountIndex >= 0 ? accounts[accountIndex].name : '不关联账户'}} ›
-        </view>
-      </picker>
-    </view>
-    <view class="field-row">
-      <text class="field-label">商户/备注</text>
-      <input placeholder="选填" value="{{merchant}}" bindinput="onMerchant" />
-    </view>
-    <view class="field-row">
-      <text class="field-label">备注</text>
-      <input placeholder="选填" value="{{description}}" bindinput="onDesc" />
-    </view>
-    <view class="field-row" wx:if="{{activeType === 'expense'}}">
-      <text class="field-label">私密消费</text>
-      <switch checked="{{isPrivate}}" bindchange="onPrivate" color="#7f77dd" />
-    </view>
-  </view>
-
-  <view class="save-area">
-    <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSave">
-      {{saving ? '保存中…' : '保存'}}
-    </button>
   </view>
 </view>

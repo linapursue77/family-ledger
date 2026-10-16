@@ -1,184 +1,179 @@
 <view class="page">
-  <!-- 时间控件 -->
-  <view class="time-picker-bar" bindtap="toggleOptions">
-    <view class="time-picker-left">
-      <text class="time-picker-icon">📅</text>
-      <text class="time-picker-text">{{activePresetLabel}}</text>
-    </view>
-    <text class="time-picker-arrow">›</text>
-  </view>
-  <view class="time-picker-options {{showOptions ? 'show' : ''}}">
+  <!-- 时间范围：单行胶囊选择器，与 H5 / 报告页同款风格 -->
+  <view class="period-row">
     <view
       wx:for="{{presets}}"
       wx:key="key"
-      class="time-picker-option {{activePreset === item.key ? 'active' : ''}}"
+      class="period-chip {{activePreset === item.key ? 'active' : ''}}"
       data-key="{{item.key}}"
       bindtap="onPreset"
     >{{item.label}}</view>
-    <view class="time-picker-option custom">📆 自定义</view>
   </view>
-  <view class="time-range-display" wx:if="{{ov}}">
-    <text class="time-range-text">{{ov.range.start}} ~ {{ov.range.end}}</text>
+
+  <!-- 自定义区间面板 -->
+  <view wx:if="{{showCustom}}" class="custom-panel">
+    <picker mode="date" value="{{customStart}}" start="{{customMin}}" end="{{customEnd}}" bindchange="onCustomStart">
+      <view class="custom-date {{customStart ? '' : 'placeholder'}}">{{customStart || '开始日期'}}</view>
+    </picker>
+    <text class="custom-sep">至</text>
+    <picker mode="date" value="{{customEnd}}" start="{{customStart || customMin}}" end="{{today}}" bindchange="onCustomEnd">
+      <view class="custom-date {{customEnd ? '' : 'placeholder'}}">{{customEnd || '结束日期'}}</view>
+    </picker>
+    <view class="custom-ok" bindtap="applyCustom">确定</view>
   </view>
+
+  <view wx:if="{{ov}}" class="period-range">{{ov.range.start}} ~ {{ov.range.end}}</view>
 
   <block wx:if="{{ov}}">
     <!-- 资产卡 -->
     <view class="asset-card" bindtap="goAsset">
-      <view class="label">🏦 家庭总资产</view>
-      <view class="amount">¥{{ov.total_assets}}</view>
+      <view class="label">🏦 家庭净资产</view>
+      <view class="amount">¥{{ovText.totalAssets}}</view>
       <view class="change">{{assetChange}} › 点击查看净值曲线</view>
-    </view>
-
-    <!-- 快捷入口 -->
-    <view class="quick-grid">
-      <view class="quick-item" bindtap="goAccounts">
-        <text class="quick-icon">🏦</text>
-        <text class="quick-text">账户</text>
-      </view>
-      <view class="quick-item" bindtap="goLoans">
-        <text class="quick-icon">🤝</text>
-        <text class="quick-text">借出借入</text>
-      </view>
-      <view class="quick-item" bindtap="goReturns">
-        <text class="quick-icon">📈</text>
-        <text class="quick-text">收益</text>
-      </view>
-      <view class="quick-item" bindtap="goFamily">
-        <text class="quick-icon">🏠</text>
-        <text class="quick-text">家庭</text>
+      <!-- 收益单独拎出来；账本维度在资产明细弹窗里看 -->
+      <view wx:if="{{invest.show}}" class="invest-line" catchtap="goReturns">
+        <text class="invest-label">其中收益</text>
+        <text class="invest-value {{invest.up ? 'profit-up' : 'profit-down'}}">{{invest.profitText}}</text>
+        <text class="invest-dim">投资总金额 ¥{{invest.valueText}} ›</text>
       </view>
     </view>
 
-    <!-- 收支切换 -->
-    <view class="income-expense-toggle">
-      <view class="toggle-btn {{activeTab === 'expense' ? 'active' : ''}}" data-tab="expense" bindtap="onTab">💸 支出</view>
-      <view class="toggle-btn {{activeTab === 'income' ? 'active' : ''}}" data-tab="income" bindtap="onTab">💰 收入</view>
-    </view>
-
-    <!-- 支出内容 -->
-    <block wx:if="{{activeTab === 'expense'}}">
-      <view class="card summary-card">
-        <view class="summary-main">
-          <text class="summary-label">本月支出</text>
-          <text class="summary-value text-expense">¥{{ov.expense}}</text>
+    <!-- 本期收支：资产卡是「存量」，这里补上所选周期内的「流量」口径 -->
+    <view class="flow-card">
+      <view class="flow-row">
+        <view class="flow-item">
+          <view class="flow-label">收入</view>
+          <view class="flow-value text-income">¥{{ovText.income}}</view>
         </view>
-        <text class="summary-sub text-muted">比上月 {{ov.saving_rate}}%</text>
+        <view class="flow-item flow-with-border">
+          <view class="flow-label">支出</view>
+          <view class="flow-value text-expense">¥{{ovText.expense}}</view>
+        </view>
+        <view class="flow-item flow-with-border">
+          <view class="flow-label">结余</view>
+          <view class="flow-value {{ov.balance_cents >= 0 ? 'text-income' : 'text-expense'}}">¥{{ovText.balance}}</view>
+        </view>
       </view>
+      <view class="flow-rate">
+        <text class="rate-label">储蓄率</text>
+        <view class="rate-bar">
+          <view class="rate-fill" style="width: {{ovText.rateWidth}}%"></view>
+        </view>
+        <text class="rate-value">{{ov.saving_rate}}%</text>
+      </view>
+    </view>
 
-      <view class="card">
-        <view class="section-title">支出分类</view>
-        <view class="pie-row">
-          <view class="pie" style="{{pieStyle}}"></view>
-          <view class="mini-legend">
-            <view class="legend-row" wx:for="{{ov.expense_categories}}" wx:key="category_id">
-              <text class="legend-name">{{item.name}}</text>
-              <text class="legend-pct">{{item.percent}}%</text>
-            </view>
+    <!-- 近期账单：报告页已覆盖分析，这里展示逐笔流水明细 -->
+    <view class="card bill-card">
+      <view class="bill-head">
+        <view class="bill-title">
+          <text class="bill-title-text">{{recentLabel}}账单</text>
+          <view class="bill-sorts">
+            <text class="{{billSort === 'time' ? 'on' : ''}}" data-sort="time" bindtap="setBillSort">按时间</text>
+            <text class="{{billSort === 'cat' ? 'on' : ''}}" data-sort="cat" bindtap="setBillSort">按分类</text>
           </view>
         </view>
-        <view class="category-list">
+      </view>
+
+      <view class="bill-range">
+        <text
+          class="bill-range-item {{recentRange === 'follow' ? 'on' : ''}}"
+          data-key="follow"
+          bindtap="onRecentRange"
+        >跟随周期</text>
+        <text
+          class="bill-range-item {{recentRange === 3 ? 'on' : ''}}"
+          data-key="{{3}}"
+          bindtap="onRecentRange"
+        >近3日</text>
+        <text
+          class="bill-range-item {{recentRange === 7 ? 'on' : ''}}"
+          data-key="{{7}}"
+          bindtap="onRecentRange"
+        >近1周</text>
+      </view>
+
+      <view wx:if="{{!recentLoading && billGroups.length}}" class="bill-summary">
+        共 {{billSummary.count}} 笔 ·
+        <text class="text-expense">支 ¥{{billSummary.expenseText}}</text> ·
+        <text class="text-income">收 ¥{{billSummary.incomeText}}</text>
+      </view>
+
+      <view wx:if="{{recentLoading}}" class="bill-loading">加载中…</view>
+      <view wx:elif="{{!billGroups.length}}" class="bill-empty">该区间暂无账单</view>
+
+      <view wx:else class="bill-groups">
+        <view wx:for="{{billGroups}}" wx:key="key" class="bill-group">
+          <view class="bill-day">
+            <view class="bill-day-name">
+              <block wx:if="{{billSort === 'time'}}">
+                <text>{{item.dayText}}</text>
+                <text class="bill-day-tag">{{item.dayLabel}}</text>
+              </block>
+              <block wx:else>
+                <text class="bill-cat-ic" style="background: {{item.color}}22">{{item.icon}}</text>
+                <text>{{item.key}}</text>
+              </block>
+            </view>
+            <view class="bill-day-sum">
+              <text wx:if="{{item.expense}}" class="text-expense">支:{{item.expenseText}}</text>
+              <text wx:if="{{item.income}}" class="text-income">收:{{item.incomeText}}</text>
+            </view>
+          </view>
+          <!-- 条目：点击进编辑，左滑露出删除 -->
           <view
-            class="category-item"
-            wx:for="{{ov.expense_categories}}"
-            wx:key="category_id"
-            data-cat="{{item}}"
-            bindtap="openCategory"
+            wx:for="{{item.items}}"
+            wx:for-item="t"
+            wx:key="id"
+            class="bill-swipe"
           >
-            <view class="category-icon" style="background: {{item.color}}22">{{item.icon}}</view>
-            <view class="category-info">
-              <view class="category-name">{{item.name}} <text class="category-percent">{{item.percent}}%</text></view>
-              <view class="progress-bar">
-                <view class="progress-fill" style="width: {{item.percent}}%; background: {{item.color}}"></view>
+            <view
+              class="bill-del {{t.isLoan ? 'disabled' : ''}}"
+              data-id="{{t.id}}"
+              data-loan="{{t.isLoan}}"
+              catchtap="onDelete"
+            >{{t.isLoan ? '借贷' : '删除'}}</view>
+            <view
+              class="bill-item {{swipeId === t.id ? 'swiping' : ''}}"
+              style="{{swipeId === t.id ? 'transform:translateX(' + swipeOffset + 'px);' : ''}}"
+              data-tx="{{t}}"
+              bindtap="onBillTap"
+              bindtouchstart="onSwipeStart"
+              bindtouchmove="onSwipeMove"
+              bindtouchend="onSwipeEnd"
+              bindtouchcancel="onSwipeEnd"
+            >
+              <view class="bill-ic" style="background: {{t.catColor}}22; color: {{t.catColor}}">{{t.catIcon}}</view>
+              <view class="bill-info">
+                <view class="bill-merchant">{{t.merchant}}</view>
+                <view wx:if="{{t.accountName}}" class="bill-account">{{t.accountName}}</view>
               </view>
-            </view>
-            <text class="category-amount">¥{{item.amount}}</text>
-          </view>
-        </view>
-      </view>
-    </block>
-
-    <!-- 收入内容 -->
-    <block wx:if="{{activeTab === 'income'}}">
-      <view class="card summary-card">
-        <view class="summary-main">
-          <text class="summary-label">本月收入</text>
-          <text class="summary-value text-income">¥{{ov.income}}</text>
-        </view>
-        <text class="summary-sub text-muted">储蓄率 {{ov.saving_rate}}%</text>
-      </view>
-
-      <view class="card">
-        <view class="section-title">收入构成</view>
-        <view class="pie-row">
-          <view class="pie" style="{{pieStyle}}"></view>
-          <view class="mini-legend">
-            <view class="legend-row" wx:for="{{ov.income_categories}}" wx:key="category_id">
-              <text class="legend-name">{{item.name}}</text>
-              <text class="legend-pct">{{item.percent}}%</text>
+              <text class="bill-amount {{t.isLoan ? 'text-loan' : (t.isIn ? 'text-income' : 'text-expense')}}">{{t.amountText}}</text>
             </view>
           </view>
         </view>
-        <view class="category-list">
-          <view
-            class="category-item"
-            wx:for="{{ov.income_categories}}"
-            wx:key="category_id"
-            data-cat="{{item}}"
-            bindtap="openCategory"
-          >
-            <view class="category-icon" style="background: {{item.color}}22">{{item.icon}}</view>
-            <view class="category-info">
-              <view class="category-name">{{item.name}} <text class="category-percent">{{item.percent}}%</text></view>
-              <view class="progress-bar">
-                <view class="progress-fill" style="width: {{item.percent}}%; background: {{item.color}}"></view>
-              </view>
-            </view>
-            <text class="category-amount">¥{{item.amount}}</text>
-          </view>
-        </view>
       </view>
-    </block>
+    </view>
   </block>
 
+  <view wx:elif="{{needLogin}}" class="empty login-empty">
+    <view class="login-lock">🔒</view>
+    <view class="login-text">登录后查看家庭收支与资产数据</view>
+    <button class="login-btn" bindtap="goLogin">立即登录</button>
+  </view>
   <view wx:elif="{{loading}}" class="empty">加载中…</view>
   <view wx:else class="empty">暂无数据</view>
 
   <!-- 浮动记账按钮 -->
   <view class="floating-btn" bindtap="goAdd">+</view>
 
-  <!-- 账户弹窗 -->
-  <view wx:if="{{showAccounts}}" class="sheet-mask" bindtap="closeAccounts">
-    <view class="sheet" catchtap>
-      <view class="sheet-head">
-        <text class="sheet-title">账户管理</text>
-        <text class="sheet-close" bindtap="closeAccounts">×</text>
-      </view>
-      <view class="list-item" wx:for="{{accounts}}" wx:key="id">
-        <text class="acc-icon">{{item.icon}}</text>
-        <view class="acc-info">
-          <text class="acc-name">{{item.name}}</text>
-          <text class="acc-book text-muted">{{item.book_type}}</text>
-        </view>
-        <text class="acc-balance">¥{{item.balance}}</text>
-      </view>
-    </view>
-  </view>
-
-  <!-- 分类明细弹窗 -->
-  <view wx:if="{{showCategory}}" class="sheet-mask" bindtap="closeCategory">
-    <view class="sheet" catchtap>
-      <view class="sheet-head">
-        <text class="sheet-title">{{activeCategory.name}}明细</text>
-        <text class="sheet-close" bindtap="closeCategory">×</text>
-      </view>
-      <view class="list-item" wx:for="{{categoryTxs}}" wx:key="id">
-        <view class="tx-info">
-          <text class="tx-merchant">{{item.merchant}}</text>
-          <text class="tx-date text-muted">{{item.dateText}}</text>
-        </view>
-        <text class="tx-amount {{item.type === 'income' ? 'text-income' : 'text-expense'}}">{{item.amountText}}</text>
-      </view>
-      <view wx:if="{{!categoryTxs.length}}" class="empty">暂无记录</view>
-    </view>
-  </view>
+  <!-- 流水详情弹层：借贷流水由借钱来往维护，这里只可查看 -->
+  <tx-detail-sheet
+    visible="{{showTxDetail}}"
+    tx="{{detailTx}}"
+    tx-id="{{detailTxId}}"
+    bind:close="closeTxDetail"
+    bind:edit="onTxEdit"
+    bind:deleted="onTxDeleted"
+  />
 </view>

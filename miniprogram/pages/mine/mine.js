@@ -1,5 +1,7 @@
 const api = require('../../utils/api')
 const { yuan } = require('../../utils/money')
+const { requireLogin } = require('../../utils/request')
+const { appPayload, toAppMessage, toTimeline } = require('../../utils/share')
 
 const ACCOUNT_TYPES = [
   { key: 'personal', label: '个人账户' },
@@ -16,6 +18,7 @@ Page({
   data: {
     user: null,
     family: null,
+    isLoggedIn: false,
     accounts: [],
     accountTypes: ACCOUNT_TYPES,
     bookTypes: BOOK_TYPES,
@@ -35,10 +38,23 @@ Page({
     hasPassword: false,
     pwdTitle: '设置密码',
     pwdText: '未设置',
+    // 定时记账：菜单显示启用中的规则数
+    recText: '',
   },
 
   onShow() {
     this.load()
+  },
+
+  /** 只取启用中的规则数，失败就留空，不影响「我的」页其它数据 */
+  async loadRecurring() {
+    try {
+      const list = await api.recurringList()
+      const n = (list || []).filter((r) => r.is_active).length
+      this.setData({ recText: n ? `${n} 条运行中` : '' })
+    } catch (e) {
+      this.setData({ recText: '' })
+    }
   },
 
   async load() {
@@ -46,6 +62,7 @@ Page({
       const [me, accounts] = await Promise.all([api.me(), api.accounts()])
       const hasPwd = !!me.user.has_password
       this.setData({
+        isLoggedIn: true,
         user: me.user,
         family: me.family,
         hasPassword: hasPwd,
@@ -56,12 +73,37 @@ Page({
           balanceText: yuan(a.balance_cents).toFixed(2),
         })),
       })
+      this.loadRecurring()
     } catch (e) {
+      // 未登录：页面照常展示，用户卡变成「点击登录」，数据区显示引导
+      if (requireLogin(e)) {
+        this.setData({ isLoggedIn: false, user: null, family: null, accounts: [] })
+        return
+      }
       wx.showToast({ title: e.message, icon: 'none' })
     }
   },
 
+  goLogin() {
+    wx.navigateTo({ url: '/pages/login/login' })
+  },
+
+  /** 用户卡点击：未登录 → 登录页 */
+  onUserTap() {
+    if (!this.data.isLoggedIn) this.goLogin()
+  },
+
+  /** 功能入口统一拦一道：未登录先去登录 */
+  _guardLogin() {
+    if (!this.data.isLoggedIn) {
+      this.goLogin()
+      return true
+    }
+    return false
+  },
+
   openAdd() {
+    if (this._guardLogin()) return
     this.setData({ showAdd: true, newName: '', newBalance: '' })
   },
   closeAdd() {
@@ -180,15 +222,36 @@ Page({
   },
 
   goAccounts() {
+    if (this._guardLogin()) return
     wx.navigateTo({ url: '/pages/accounts/accounts' })
   },
   goLoans() {
+    if (this._guardLogin()) return
     wx.navigateTo({ url: '/pages/loans/loans' })
   },
   goReturns() {
+    if (this._guardLogin()) return
     wx.navigateTo({ url: '/pages/returns/returns' })
   },
+  goRecurring() {
+    if (this._guardLogin()) return
+    wx.navigateTo({ url: '/pages/recurring/recurring' })
+  },
+
+  // ---- 分享：右上角菜单和列表里的「分享给好友」按钮都会走到这里
+  onShareAppMessage() {
+    return toAppMessage(appPayload())
+  },
+  onShareTimeline() {
+    return toTimeline(appPayload())
+  },
   goFamily() {
+    if (this._guardLogin()) return
     wx.navigateTo({ url: '/pages/family/family' })
+  },
+  goImport() {
+    // 与 H5 一致：导入是低频功能，入口放在「我的」里，不占底部 tab
+    if (this._guardLogin()) return
+    wx.navigateTo({ url: '/pages/import/import' })
   },
 })

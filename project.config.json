@@ -1,0 +1,37 @@
+{
+  "description": "钱来钱往记账 · 仓库根作为项目目录，小程序代码在 miniprogram/ 子目录",
+  "projectname": "family-ledger",
+  "appid": "wx992d0814ac3bb68f",
+  "compileType": "miniprogram",
+  "libVersion": "3.5.0",
+  "miniprogramRoot": "miniprogram/",
+  "setting": {
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "uglifyFileName": false,
+    "enhance": true,
+    "urlCheck": false,
+    "packNpmRelationList": [],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "useCompilerPlugins": false
+  },
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "backend" },
+      { "type": "folder", "value": "deploy" },
+      { "type": "folder", "value": "docs" },
+      { "type": "folder", "value": "frontend" },
+      { "type": "file", "value": "DEPLOY.md" },
+      { "type": "file", "value": "LICENSE" },
+      { "type": "file", "value": "README.md" }
+    ],
+    "include": []
+  },
+  "editorSetting": {}
+}

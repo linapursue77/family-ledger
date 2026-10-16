@@ -34,6 +34,9 @@ module.exports = {
   invites: () => request('GET', '/families/invitations/'),
   createInvite: (data) => request('POST', '/families/invitations/', data),
   revokeInvite: (id) => request('DELETE', `/families/invitations/${id}/revoke/`),
+  // 被邀请人视角：join 落地页用，登录即可，不需要是本家庭成员
+  invitePreview: (token) => request('GET', '/families/invitations/preview/', { token }),
+  acceptInvite: (token) => request('POST', '/families/invitations/accept/', { token }),
   updateMember: (id, data) => request('PATCH', `/families/members/${id}/`, data),
   removeMember: (id) => request('DELETE', `/families/members/${id}/`),
   transferOwner: (id) => request('POST', `/families/members/${id}/transfer-owner/`),
@@ -42,9 +45,24 @@ module.exports = {
 
   // 账本
   categories: (kind) => request('GET', '/ledger/categories/', { kind }),
+  // 定时记账：周期规则自动生成流水
+  recurringList: () => request('GET', '/ledger/recurring/'),
+  recurringCreate: (data) => request('POST', '/ledger/recurring/', data),
+  recurringUpdate: (id, data) => request('PATCH', `/ledger/recurring/${id}/`, data),
+  recurringRemove: (id) => request('DELETE', `/ledger/recurring/${id}/`),
+  recurringRun: (id) => request('POST', `/ledger/recurring/${id}/run/`, {}),
+  // 记账页的「＋」新增自定义分类：kind 为 expense / income
+  createCategory: (data) => request('POST', '/ledger/categories/', data),
   overview: (params) => request('GET', '/ledger/overview/', params),
   transactions: (params) => request('GET', '/ledger/transactions/', params),
   createTx: (data) => request('POST', '/ledger/transactions/', data),
+  // 流水详情 / 改一笔 / 删一笔。
+  // 注意：借贷流水（loan_in / loan_out）后端会拒绝改删，必须去「借钱来往」里操作。
+  txDetail: (id) => request('GET', `/ledger/transactions/${id}/`),
+  updateTx: (id, data) => request('PATCH', `/ledger/transactions/${id}/`, data),
+  removeTx: (id) => request('DELETE', `/ledger/transactions/${id}/`),
+  // 商户/备注历史：记账页的「最近用过」快捷填充
+  merchantHistory: (params) => request('GET', '/ledger/merchants/history/', params),
 
   // 导入
   uploadImport: (filePath, platform) => upload('/ledger/imports/', filePath, { platform }),

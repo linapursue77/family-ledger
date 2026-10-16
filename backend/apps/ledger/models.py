@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """分类、交易流水、导入任务（PRD 6.2.3）。"""
+from datetime import date, timedelta
 from uuid import uuid4
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 def _uuid():
@@ -96,6 +98,137 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f'{self.get_type_display()} {self.amount_cents} {self.merchant}'
+
+
+class RecurringRule(models.Model):
+    """周期记账规则（定时记账）。
+
+    到点由定时任务按规则自动生成一笔流水并入账（联动账户余额），
+    成员不必每月手动记房租、每周期记通勤这类固定收支。
+
+    ★ next_run 是「下一次该执行的日期」，执行后即推进，
+      所以同一个规则在同一天重复跑不会产生重复流水。
+    """
+
+    FREQ_DAILY = 'daily'
+    FREQ_WEEKLY = 'weekly'
+    FREQ_MONTHLY = 'monthly'
+    FREQ_CHOICES = [(FREQ_DAILY, '每天'), (FREQ_WEEKLY, '每周'), (FREQ_MONTHLY, '每月')]
+
+    TYPE_CHOICES = [(Transaction.TYPE_EXPENSE, '支出'), (Transaction.TYPE_INCOME, '收入')]
+
+    # 月末兜底：规则里 day_of_month=31 遇到小月时落到该月最后一天
+    MONTH_END = 31
+
+    id = models.CharField(primary_key=True, max_length=36, default=_uuid, editable=False)
+    family = models.ForeignKey('families.Family', on_delete=models.CASCADE,
+                               related_name='recurring_rules', verbose_name='家庭')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name='recurring_rules', verbose_name='记账人')
+    name = models.CharField('规则名称', max_length=50)
+    type = models.CharField('类型', max_length=16, choices=TYPE_CHOICES,
+                            default=Transaction.TYPE_EXPENSE)
+    amount_cents = models.BigIntegerField('金额(分)')
+    account = models.ForeignKey('accounts.Account', on_delete=models.SET_NULL,
+                                null=True, blank=True, related_name='recurring_rules',
+                                verbose_name='账户')
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='recurring_rules', verbose_name='分类')
+    merchant = models.CharField('商户/备注', max_length=100, blank=True, default='')
+
+    frequency = models.CharField('频率', max_length=16, choices=FREQ_CHOICES, default=FREQ_MONTHLY)
+    interval = models.IntegerField('间隔', default=1)          # 每 N 天/周/月
+    weekday = models.IntegerField('周几', null=True, blank=True)   # 0=周一 … 6=周日（每周）
+    day_of_month = models.IntegerField('每月几号', null=True, blank=True)  # 1-31（每月）
+
+    start_date = models.DateField('开始日期')
+    end_date = models.DateField('结束日期', null=True, blank=True)
+    next_run = models.DateField('下次执行', db_index=True)
+    is_active = models.BooleanField('启用', default=True)
+    is_private = models.BooleanField('私密消费', default=False)
+
+    run_count = models.IntegerField('已生成笔数', default=0)
+    last_run_at = models.DateTimeField('上次执行时间', null=True, blank=True)
+    last_error = models.CharField('上次错误', max_length=300, blank=True, default='')
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        db_table = 'recurring_rules'
+        verbose_name = '周期记账规则'
+        verbose_name_plural = '周期记账规则'
+        ordering = ['is_active', 'next_run', '-created_at']
+        indexes = [
+            models.Index(fields=['family', 'is_active'], name='idx_rec_family_active'),
+            models.Index(fields=['is_active', 'next_run'], name='idx_rec_due'),
+        ]
+
+    def __str__(self):
+        return f'{self.name} · {self.get_frequency_display()} · ¥{self.amount_cents / 100:.2f}'
+
+    # ------------------------------------------------------------------ 排期
+    def schedule_text(self):
+        """人话描述频率，如「每月 5 日」「每周 一」「每 2 天」。"""
+        if self.frequency == self.FREQ_DAILY:
+            return '每天' if self.interval <= 1 else f'每 {self.interval} 天'
+        if self.frequency == self.FREQ_WEEKLY:
+            names = ['一', '二', '三', '四', '五', '六', '日']
+            wd = names[self.weekday] if self.weekday is not None else '一'
+            return f'每周 {wd}' if self.interval <= 1 else f'每 {self.interval} 周 周{wd}'
+        day = self.day_of_month or 1
+        day_text = f'{day} 日' if day != self.MONTH_END else '月末'
+        return f'每月 {day_text}' if self.interval <= 1 else f'每 {self.interval} 月 {day_text}'
+
+    def _monthly_date(self, year, month):
+        """按月生成日期；day_of_month=31 视为月末，小月自动落到最后一天。"""
+        import calendar
+        day = self.day_of_month or 1
+        last = calendar.monthrange(year, month)[1]
+        return date(year, month, min(day, last))
+
+    def next_after(self, base):
+        """算出 base 之后（严格 > base）的下一次执行日期。
+
+        间隔 > 1 时统一以 start_date 为基准网格推进，避免逐次累加导致漂移。
+        """
+        interval = max(int(self.interval or 1), 1)
+        start = self.start_date
+
+        if self.frequency == self.FREQ_DAILY:
+            return base + timedelta(days=interval)
+
+        if self.frequency == self.FREQ_WEEKLY:
+            target = self.weekday if self.weekday is not None else 0
+            if interval == 1:
+                delta = (target - base.weekday()) % 7
+                return base + timedelta(days=delta or 7)
+            k = (base - start).days // (7 * interval) + 1
+            while True:
+                anchor = start + timedelta(weeks=k * interval)
+                candidate = anchor + timedelta(days=(target - anchor.weekday()) % 7)
+                if candidate > base:
+                    return candidate
+                k += 1
+
+        # 每月
+        if interval == 1:
+            candidate = self._monthly_date(base.year, base.month)
+            if candidate > base:
+                return candidate
+            month, year = base.month + 1, base.year
+            if month > 12:
+                month, year = 1, year + 1
+            return self._monthly_date(year, month)
+        k = ((base.year - start.year) * 12 + (base.month - start.month)) // interval + 1
+        while True:
+            total = (start.month - 1) + k * interval
+            candidate = self._monthly_date(start.year + total // 12, total % 12 + 1)
+            if candidate > base:
+                return candidate
+            k += 1
+
+    def is_expired(self, today=None):
+        return bool(self.end_date) and (today or timezone.now().date()) > self.end_date
 
 
 class AISettings(models.Model):

@@ -30,7 +30,7 @@ from apps.families.services import (
     member_nicknames,
     require_member,
 )
-from apps.ledger.models import AISettings, Category, ImportTask, Transaction
+from apps.ledger.models import AISettings, Category, ImportTask, RecurringRule, Transaction
 from apps.loans.services import summarize as loan_summary
 from apps.membership.services import has_benefit
 
@@ -39,8 +39,10 @@ FREE_PRESETS = {'last_week', 'last_month', 'last_3months'}
 from apps.ledger.serializers import (
     CategoryCreateSerializer,
     CategorySerializer,
+    RecurringRuleSerializer,
     TransactionCreateSerializer,
 )
+from apps.ledger.recurring import execute_rule, rule_to_dict, run_due_rules
 from apps.ledger.services import (
     ASYNC_THRESHOLD_BYTES,
     MAX_UPLOAD_BYTES,
@@ -1080,3 +1082,172 @@ class ImportTaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
             'failed_count': task.failed_count,
             'created_at': task.created_at.strftime('%Y-%m-%d %H:%M:%S'),
         }
+
+
+class RecurringRuleViewSet(viewsets.ModelViewSet):
+    """周期记账规则：GET/PATCH/DELETE /ledger/recurring/，POST /ledger/recurring/{id}/run/。
+
+    规则到点由定时任务（apps.ledger.recurring.run_due_rules）自动生成流水，
+    这里只负责规则的增删改查与手动触发。
+    """
+
+    permission_classes = [IsAuthenticated, IsFamilyMember]
+
+    def get_queryset(self):
+        member = require_member(self.request.user)
+        return (RecurringRule.objects
+                .filter(family=member.family)
+                .select_related('account', 'category'))
+
+    def list(self, request, *args, **kwargs):
+        rules = self.get_queryset()
+        return api_response([rule_to_dict(r) for r in rules])
+
+    def retrieve(self, request, *args, **kwargs):
+        return api_response(rule_to_dict(self.get_object()))
+
+    def create(self, request, *args, **kwargs):
+        member = require_member(request.user)
+        if not member.effective_permissions.get('allow_record', True):
+            raise BusinessError('主账号尚未授权你记账，请联系 TA 在家庭管理里开启', code=4003)
+
+        ser = RecurringRuleSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+        rule = self._build_rule(member, data)
+        return api_response(rule_to_dict(rule), message='已创建规则',
+                            http_status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        return self._update_rule(request, partial=kwargs.pop('partial', False))
+
+    def partial_update(self, request, *args, **kwargs):
+        return self._update_rule(request, partial=True)
+
+    def destroy(self, request, *args, **kwargs):
+        rule = self.get_object()
+        rule.delete()
+        return api_response(message='已删除规则')
+
+    @action(detail=True, methods=['post'])
+    def run(self, request, *args, **kwargs):
+        """立即按规则记一笔（不影响原本的下次执行日，除非今天本就该执行）。"""
+        rule = self.get_object()
+        if not rule.is_active:
+            raise BusinessError('规则已停用，请先启用', code=4005)
+        with transaction.atomic():
+            created = execute_rule(rule, force=True)
+        return api_response({'created': len(created), 'transaction_id': created[0] if created else ''},
+                            message='已记一笔')
+
+    @action(detail=False, methods=['post'])
+    def run_due(self, request, *args, **kwargs):
+        """手动触发一次到期扫描（正常由定时任务每天跑，这里给页面兜底）。"""
+        member = require_member(request.user)
+        stats = run_due_rules()
+        return api_response(stats, message=f"已生成 {stats['created']} 笔")
+
+    # ------------------------------------------------------------------ 内部
+    def _build_rule(self, member, data):
+        """按入参落库；账户/分类都校验在本家庭可见范围内。"""
+        from apps.accounts.services import visible_accounts
+
+        family = member.family
+        account = None
+        account_id = data.get('account')
+        if account_id:
+            account = visible_accounts(family, member.user).filter(id=account_id).first()
+            if account is None:
+                raise BusinessError('账户不存在或无权记账到该账户')
+
+        category = None
+        category_id = data.get('category')
+        if category_id:
+            category = Category.objects.filter(id=category_id).first()
+
+        start = data['start_date']
+        rule = RecurringRule(
+            family=family,
+            user=member.user,
+            name=data['name'],
+            type=data.get('type') or RecurringRule.TYPE_EXPENSE,
+            amount_cents=to_cents(data['amount']),
+            account=account,
+            category=category,
+            merchant=data.get('merchant') or '',
+            frequency=data.get('frequency') or RecurringRule.FREQ_MONTHLY,
+            interval=data.get('interval') or 1,
+            weekday=data.get('weekday'),
+            day_of_month=data.get('day_of_month'),
+            start_date=start,
+            end_date=data.get('end_date'),
+            is_active=bool(data.get('is_active', True)),
+            is_private=bool(data.get('is_private')) and data.get('type') != 'income',
+            next_run=start,
+        )
+        # 开始日期已过 → 排期直接落到下一个周期点，避免建完立刻补一堆历史流水
+        today = timezone.now().date()
+        if rule.next_run <= today:
+            rule.next_run = rule.next_after(today)
+        rule.save()
+        return rule
+
+    def _update_rule(self, request, partial):
+        rule = self.get_object()
+        ser = RecurringRuleSerializer(data=request.data, partial=partial)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        if 'name' in data:
+            rule.name = data['name']
+        if 'type' in data:
+            rule.type = data['type']
+        if 'amount' in data:
+            rule.amount_cents = to_cents(data['amount'])
+        if 'merchant' in data:
+            rule.merchant = data['merchant'] or ''
+        if 'frequency' in data:
+            rule.frequency = data['frequency']
+            # 切频率时清掉另一频率的定位字段，避免脏数据影响展示与排期
+            if rule.frequency != 'weekly':
+                rule.weekday = None
+            if rule.frequency != 'monthly':
+                rule.day_of_month = None
+        if 'interval' in data:
+            rule.interval = data['interval']
+        if 'weekday' in data:
+            rule.weekday = data['weekday']
+        if 'day_of_month' in data:
+            rule.day_of_month = data['day_of_month']
+        if 'end_date' in data:
+            rule.end_date = data['end_date']
+        if 'is_active' in data:
+            rule.is_active = bool(data['is_active'])
+        if 'is_private' in data:
+            rule.is_private = bool(data['is_private']) and rule.type != 'income'
+
+        if 'account' in data:
+            from apps.accounts.services import visible_accounts
+            account_id = data.get('account')
+            if account_id:
+                account = visible_accounts(rule.family, rule.user).filter(id=account_id).first()
+                if account is None:
+                    raise BusinessError('账户不存在或无权记账到该账户')
+                rule.account = account
+            else:
+                rule.account = None
+        if 'category' in data:
+            category_id = data.get('category')
+            rule.category = Category.objects.filter(id=category_id).first() if category_id else None
+
+        # 排期相关字段变了 → 从今天起重新排下一次，避免沿用旧的过期日期
+        reschedule = any(k in data for k in ('frequency', 'interval', 'weekday',
+                                             'day_of_month', 'start_date'))
+        if 'start_date' in data:
+            rule.start_date = data['start_date']
+        if reschedule:
+            today = timezone.now().date()
+            base = max(rule.start_date, today)
+            rule.next_run = rule.next_after(base) if rule.start_date <= today else rule.start_date
+        rule.save()
+        return api_response(rule_to_dict(rule), message='已更新规则')

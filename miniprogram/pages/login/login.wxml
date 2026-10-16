@@ -15,7 +15,9 @@
     <text wx:else>登录中…</text>
   </button>
 
-  <!-- 增强：手机号快捷验证。需非个人主体 + 已认证，个人主体会自动降级 -->
+  <!-- 手机号快捷验证入口：已屏蔽。
+       该能力需「非个人主体 + 已认证 + 已开通付费」，本项目为个人主体（principal_type=0），
+       调用必然失败。若日后主体变更为企业/个体工商户，把下面整段注释取消即可恢复。
   <button
     class="wx-btn ghost"
     open-type="getPhoneNumber"
@@ -24,6 +26,7 @@
   >
     微信手机号登录
   </button>
+  -->
 
   <view class="divider" bindtap="togglePwd">
     <text>{{showPwd ? '收起密码登录' : '用手机号密码登录'}}</text>

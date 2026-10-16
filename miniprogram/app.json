@@ -10,7 +10,9 @@
     "pages/loans/loans",
     "pages/family/family",
     "pages/returns/returns",
-    "pages/asset/asset"
+    "pages/asset/asset",
+    "pages/recurring/recurring",
+    "pages/join/join"
   ],
   "window": {
     "navigationBarBackgroundColor": "#f1efe8",
@@ -36,12 +38,6 @@
         "text": "记账",
         "iconPath": "assets/tabbar/add-normal.png",
         "selectedIconPath": "assets/tabbar/add-active.png"
-      },
-      {
-        "pagePath": "pages/import/import",
-        "text": "导入",
-        "iconPath": "assets/tabbar/import-normal.png",
-        "selectedIconPath": "assets/tabbar/import-active.png"
       },
       {
         "pagePath": "pages/report/report",

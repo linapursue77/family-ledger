@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { familyApi } from '@/api'
 import ConfirmSheet from '@/components/ConfirmSheet.vue'
 import { useAuthStore } from '@/stores/auth'
+import { inviteSharePayload, share } from '@/utils/share'
 
 const route = useRoute()
 const router = useRouter()
@@ -241,6 +242,16 @@ async function submitInvite() {
 async function copyInvite() {
   if (!inviteResult.value) return
   await copyText(inviteKeywordUrl.value, '邀请链接已复制')
+}
+
+// 分享邀请给微信好友：微信内无法自定义卡片，降级为引导点右上角
+const showShareGuide = ref(false)
+async function shareInvite() {
+  if (!inviteResult.value) return
+  const r = await share(
+    inviteSharePayload(inviteResult.value.token, auth.user?.nickname || auth.user?.username),
+  )
+  if (r === 'guide') showShareGuide.value = true
 }
 
 async function revoke(id) {
@@ -614,7 +625,8 @@ onMounted(async () => {
             <div class="token">{{ inviteResult.token }}</div>
           </div>
           <div class="f-note">邀请码仅显示这一次，遗失后请重新生成。</div>
-          <button class="btn btn-primary full-btn" @click="showInvite = false">完成</button>
+          <button class="btn btn-primary full-btn" @click="shareInvite">分享给微信好友</button>
+          <button class="btn full-btn ghost-btn" @click="showInvite = false">完成</button>
         </template>
       </div>
     </div>
@@ -725,6 +737,18 @@ onMounted(async () => {
     />
 
     <div v-if="toast" class="fam-toast">{{ toast }}</div>
+
+    <!-- 微信内分享邀请引导：自定义卡片要认证服务号，这里如实引导点右上角 -->
+    <div v-if="showShareGuide" class="share-guide" @click="showShareGuide = false">
+      <div class="sg-box" @click.stop>
+        <div class="sg-arrow">↗</div>
+        <div class="sg-title">点击右上角 ⋯ 分享</div>
+        <div class="sg-step">
+          自定义邀请卡片需要已认证的公众号，当前还没有接。你可以在弹出菜单里选「发送给朋友」，或先复制链接再发给对方。
+        </div>
+        <div class="sg-ok" @click="showShareGuide = false">知道了</div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -886,6 +910,55 @@ onMounted(async () => {
 }
 .full-btn {
   margin-top: 12px;
+}
+.ghost-btn {
+  background: #f1efe8;
+  color: var(--text-sub);
+}
+
+/* 微信内分享引导遮罩 */
+.share-guide {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.sg-box {
+  width: 82%;
+  max-width: 320px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px 20px 16px;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+.sg-arrow {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 6px;
+  text-align: right;
+  color: #26215c;
+}
+.sg-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.sg-step {
+  font-size: 13px;
+  color: #888;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.sg-ok {
+  padding: 10px 0;
+  border-radius: 8px;
+  background: #26215c;
+  color: #fff;
+  font-size: 14px;
 }
 
 /* 邀请记录 */

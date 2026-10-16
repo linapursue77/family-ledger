@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const { requireLogin } = require('../../utils/request')
 const { yuan } = require('../../utils/money')
 
 function money(cents) {
@@ -113,6 +114,11 @@ Page({
         },
       })
     } catch (e) {
+      if (requireLogin(e)) {
+        // 未登录进不了本页：提示后回上一页（各 tab 首页已有登录引导）
+        wx.navigateBack({ delta: 1 })
+        return
+      }
       wx.showToast({ title: e.message || '加载失败', icon: 'none' })
     } finally {
       this.setData({ loading: false })

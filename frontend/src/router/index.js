@@ -16,6 +16,8 @@ const routes = [
   { path: '/loans', name: 'loans', component: () => import('@/views/Loans.vue') },
   // 收益管理：一年收益变化 + 今年收益对家庭总资产的影响
   { path: '/returns', name: 'returns', component: () => import('@/views/Returns.vue') },
+  // 定时记账：周期规则自动生成流水，二级页保留底部 TabBar
+  { path: '/recurring', name: 'recurring', component: () => import('@/views/Recurring.vue') },
   // 会员中心：权益介绍、套餐开通、免费试用
   { path: '/member', name: 'member', component: () => import('@/views/MemberCenter.vue') },
   // 邀请落地页：从分享链接进入，接受后才算加入家庭，因此不挂 TabBar

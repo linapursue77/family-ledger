@@ -24,6 +24,15 @@ Page({
     if (data.profile && data.profile.user && data.profile.user.nickname) {
       wx.setStorageSync('fl_nickname', data.profile.user.nickname)
     }
+    // 从邀请分享卡片进来还没登录的情况：登录完直接回 join 页继续加入流程，
+    // 不能走 switchTab，那样会把 join 的返回栈清掉，白回来一趟。
+    const app = getApp()
+    const joinToken = app.globalData.joinToken
+    app.globalData.joinToken = ''
+    if (joinToken) {
+      wx.navigateTo({ url: `/pages/join/join?token=${encodeURIComponent(joinToken)}` })
+      return
+    }
     wx.switchTab({ url: '/pages/home/home' })
   },
 
@@ -67,14 +76,19 @@ Page({
     this._wxLogin('')
   },
 
-  /** 手机号快捷验证：个人主体 / 未认证会回调 fail，自动降级为静默登录 */
+  /**
+   * 手机号快捷验证回调：能力入口已在 login.wxml 里注释屏蔽。
+   * 该方法保留，日后主体变更为企业/个体工商户并开通该能力后，
+   * 取消 wxml 里的注释即可直接复用，无需再写一遍。
+   */
   onGetPhone(e) {
     const detail = e.detail || {}
-    if (detail.errMsg && detail.errMsg.indexOf('getPhoneNumber:ok') !== 0) {
-      // 常见：个人主体无权限（no permission）、用户拒绝（deny）
-      if (detail.errMsg.indexOf('deny') === -1) {
-        wx.showToast({ title: '手机号能力不可用，已用微信登录', icon: 'none' })
-      }
+    const errMsg = detail.errMsg || ''
+    if (errMsg.indexOf('getPhoneNumber:ok') !== 0) {
+      // 用户主动拒绝：不打扰，也不擅自登录
+      if (errMsg.indexOf('deny') !== -1) return
+      // 其余失败（未认证 / 未开通付费等）降级为静默登录
+      wx.showToast({ title: '已改用微信一键登录', icon: 'none' })
       this._wxLogin('')
       return
     }

@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const { requireLogin } = require('../../utils/request')
 const { yuan } = require('../../utils/money')
 
 // 账户介质：与后端 Account.CARD_CHOICES 一一对应
@@ -97,6 +98,11 @@ Page({
       const labels = (famRes && famRes.book_labels) || {}
       this.buildGroups(raw, labels)
     } catch (e) {
+      if (requireLogin(e)) {
+        // 未登录进不了本页：提示后回上一页（各 tab 首页已有登录引导）
+        wx.navigateBack({ delta: 1 })
+        return
+      }
       wx.showToast({ title: e.message || '加载失败', icon: 'none' })
     } finally {
       this.setData({ loading: false })

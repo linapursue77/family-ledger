@@ -1,0 +1,172 @@
+<view class="page rec-page">
+  <!-- 顶部条：与 H5 一致 -->
+  <view class="top-bar">
+    <text class="top-title">⏰ 定时记账</text>
+    <text class="top-close" bindtap="onClose">×</text>
+  </view>
+
+  <!-- 说明：避免用户误以为是「提醒」 -->
+  <view class="rec-note">
+    按规则自动生成流水并入账，不用每月手动记房租、通勤这类固定收支。规则由服务端每天检查一次。
+  </view>
+
+  <view wx:if="{{loading}}" class="tip">加载中…</view>
+  <view wx:elif="{{!items.length}}" class="tip">
+    还没有定时记账规则，点下面按钮建一条
+  </view>
+
+  <view wx:else class="list">
+    <view
+      wx:for="{{items}}"
+      wx:key="id"
+      class="rec-card {{item.is_active ? '' : 'off'}}"
+    >
+      <view class="rc-head">
+        <text class="rc-icon">{{item.category_icon || (item.type === 'income' ? '💵' : '💸')}}</text>
+        <text class="rc-name">{{item.name}}</text>
+        <text class="rc-amount {{item.type === 'income' ? 'text-income' : 'text-expense'}}">
+          {{item.type === 'income' ? '+' : '-'}}¥{{item.amountText}}
+        </text>
+      </view>
+
+      <view class="rc-meta">
+        <text class="rc-freq">{{item.schedule_text}}</text>
+        <text class="rc-next">下次 {{item.next_run}}</text>
+        <text wx:if="{{item.last_error}}" class="rc-err">⚠️ {{item.last_error}}</text>
+      </view>
+
+      <view class="rc-sub">
+        <text wx:if="{{item.account_name}}">{{item.account_icon}} {{item.account_name}}</text>
+        <text wx:if="{{item.end_date}}">· 至 {{item.end_date}}</text>
+        <text>· 已生成 {{item.run_count}} 笔</text>
+        <text wx:if="{{item.is_private}}">· 🙈 私密</text>
+      </view>
+
+      <view class="rc-ops">
+        <text class="rc-op" data-id="{{item.id}}" bindtap="openEdit">编辑</text>
+        <text class="rc-op" data-id="{{item.id}}" bindtap="onToggle">
+          {{item.is_active ? '停用' : '启用'}}
+        </text>
+        <text class="rc-op" data-id="{{item.id}}" bindtap="onRunNow">立即记一笔</text>
+        <text class="rc-op danger" data-id="{{item.id}}" bindtap="onDelete">删除</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="fab" bindtap="openCreate">＋</view>
+
+  <!-- 表单弹窗 -->
+  <view wx:if="{{showForm}}" class="sheet-mask" bindtap="closeForm">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">{{editingId ? '编辑规则' : '新建规则'}}</text>
+        <text class="sheet-close" bindtap="closeForm">✕</text>
+      </view>
+
+      <view class="type-bar">
+        <view
+          wx:for="{{TYPES}}"
+          wx:key="key"
+          class="type-pill {{form.type === item.key ? 'active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onTypeChange"
+        >{{item.label}}</view>
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">规则名称</text>
+        <input placeholder="如：房租、通勤、工资" value="{{form.name}}" bindinput="onField" data-field="name" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">金额</text>
+        <input type="digit" placeholder="0.00" value="{{form.amount}}" bindinput="onField" data-field="amount" />
+      </view>
+
+      <view class="form-label">频率</view>
+      <view class="chips">
+        <view
+          wx:for="{{FREQ}}"
+          wx:key="key"
+          class="chip {{form.frequency === item.key ? 'on' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onFreqChange"
+        >{{item.label}}</view>
+        <view class="chip-inline">
+          每
+          <input
+            class="mini-input"
+            type="number"
+            min="1"
+            value="{{form.interval}}"
+            data-field="interval"
+            bindinput="onField"
+          />
+          {{form.frequency === 'daily' ? '天' : form.frequency === 'weekly' ? '周' : '月'}}
+        </view>
+      </view>
+
+      <view wx:if="{{needWeekday}}" class="chips chips-row">
+        <view
+          wx:for="{{WEEK}}"
+          wx:key="v"
+          class="chip {{form.weekday === item.v ? 'on' : ''}}"
+          data-v="{{item.v}}"
+          bindtap="onWeekdayChange"
+        >{{item.label}}</view>
+      </view>
+
+      <view wx:if="{{needMonthDay}}" class="field-row">
+        <text class="field-label">每月几号（31=月末）</text>
+        <input
+          type="number"
+          min="1"
+          max="31"
+          value="{{form.day_of_month}}"
+          data-field="day_of_month"
+          bindinput="onField"
+        />
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">开始日期</text>
+        <picker mode="date" value="{{form.start_date}}" data-field="start_date" bindchange="onDate">
+          <view class="field-value">{{form.start_date}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">结束日期（留空长期）</text>
+        <picker mode="date" value="{{form.end_date}}" data-field="end_date" bindchange="onDate">
+          <view class="field-value">{{form.end_date || '选填'}} ›</view>
+        </picker>
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">账户</text>
+        <picker range="{{accounts}}" range-key="name" value="{{accountIndex}}" bindchange="onAccount">
+          <view class="field-value">{{accountLabel}} ›</view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">分类</text>
+        <picker range="{{categories}}" range-key="name" value="{{categoryIndex}}" bindchange="onCategory">
+          <view class="field-value">{{categoryLabel}} ›</view>
+        </picker>
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">备注</text>
+        <input placeholder="选填" value="{{form.merchant}}" data-field="merchant" bindinput="onField" />
+      </view>
+
+      <view wx:if="{{form.type === 'expense'}}" class="check-line">
+        <switch checked="{{form.is_private}}" bindchange="onPrivateChange" color="#7f77dd" />
+        <text>记为私密消费（不计入共同支出）</text>
+      </view>
+
+      <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSubmit">
+        {{saving ? '保存中…' : '保存'}}
+      </button>
+      <button class="btn-secondary" bindtap="closeForm">取消</button>
+    </view>
+  </view>
+</view>

@@ -2,8 +2,13 @@
 """演示数据：为 README / 演示截图造一段"好看"的家庭账本。
 
 用法：
-    python manage.py seed_showcase            # 幂等，已存在则跳过
-    python manage.py seed_showcase --reset    # 清空重建
+    python manage.py seed_showcase                      # 默认给演示账号造数，幂等
+    python manage.py seed_showcase --reset              # 清空重建
+    python manage.py seed_showcase --openid oFSzr...    # 给指定微信账号造数（小程序登录账号）
+    python manage.py seed_showcase --phone 13800138777  # 给指定手机号账号造数
+    python manage.py seed_showcase --username xxx       # 给指定用户名账号造数
+
+指定账号时只在「该账号自己的家庭」里造数，不动演示家庭的数据，也不会改该账号的密码/昵称。
 
 产出：
     · 两个成员账号 + 一个家庭（账本名自定义、含协商阈值）
@@ -81,6 +86,9 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--reset', action='store_true', help='清空家庭已有业务数据后重建')
+        parser.add_argument('--phone', help='给该手机号账号造数（默认演示账号 13800138000）')
+        parser.add_argument('--openid', help='给该微信 openid 账号造数（小程序登录账号）')
+        parser.add_argument('--username', help='给该用户名账号造数')
 
     def handle(self, *args, **options):
         if not Category.objects.exists():
@@ -88,7 +96,8 @@ class Command(BaseCommand):
             return
 
         rng = random.Random(RANDOM_SEED)
-        owner, spouse, family = self._ensure_family()
+        is_default = not any((options.get('phone'), options.get('openid'), options.get('username')))
+        owner, spouse, family = self._ensure_family(options, is_default)
         if options['reset']:
             self._reset(family)
         elif Transaction.objects.filter(family=family).exists():
@@ -107,7 +116,39 @@ class Command(BaseCommand):
         self._report(family, accounts)
 
     # ---------- 基础 ----------
-    def _ensure_family(self):
+    def _resolve_user(self, options):
+        """按 openid / phone / username 定位目标账号；不存在就报错，绝不自动新建。"""
+        from django.core.management.base import CommandError
+
+        try:
+            if options.get('openid'):
+                return User.objects.get(openid=options['openid'])
+            if options.get('phone'):
+                return User.objects.get(phone=options['phone'])
+            return User.objects.get(username=options['username'])
+        except User.DoesNotExist:
+            raise CommandError(
+                f'找不到账号：{options.get("openid") or options.get("phone") or options.get("username")}。'
+                '请先在小程序里登录一次，再到 users 表确认 openid。')
+
+    def _ensure_family(self, options, is_default=True):
+        if not is_default:
+            # 给已有账号（如小程序登录后自动创建的微信账号）造数：
+            # 沿用它自己的家庭与成员身份，不额外造第二个成员。
+            owner = self._resolve_user(options)
+            family = Family.objects.filter(owner=owner).first()
+            if family is None:
+                family = Family.objects.create(owner=owner, name='我的家庭')
+            FamilyMember.objects.get_or_create(
+                family=family, user=owner,
+                defaults={'role': FamilyMember.ROLE_OWNER,
+                          'nickname': owner.nickname or owner.username,
+                          'book_type': FamilyMember.BOOK_HUSBAND})
+            Threshold.objects.get_or_create(family=family, defaults={
+                'small_limit_cents': 80000, 'notify_limit_cents': 300000,
+                'approve_limit_cents': 800000})
+            return owner, None, family
+
         owner, _ = User.objects.get_or_create(
             username=OWNER_PHONE,
             defaults={'phone': OWNER_PHONE, 'nickname': OWNER_NICK},
@@ -169,7 +210,8 @@ class Command(BaseCommand):
     def _build_accounts(self, owner, spouse, family):
         accounts = []
         for name, icon, who, book, card, bank, count_total, opening in ACCOUNTS:
-            user = owner if who == 'owner' else spouse
+            # 单账号造数时（spouse=None）所有账户都挂在本人名下
+            user = owner if (who == 'owner' or spouse is None) else spouse
             account, created = Account.objects.get_or_create(
                 family=family, user=user, name=name,
                 defaults={'icon': icon, 'type': Account.TYPE_PERSONAL, 'book_type': book,
@@ -226,7 +268,7 @@ class Command(BaseCommand):
     def _add(self, owner, spouse, family, accounts, rng, *, who, acc_idx, category,
              merchants, lo, hi, month, days, tx_type, is_private,
              fixed_day=None, description=''):
-        user = owner if who == 'owner' else spouse
+        user = owner if (who == 'owner' or spouse is None) else spouse
         account = accounts[acc_idx]
         day = fixed_day or rng.randint(1, days)
         # 当前月不生成"未来"的流水
@@ -323,8 +365,13 @@ class Command(BaseCommand):
         loan = summarize(family)
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS('演示数据就绪'))
-        self.stdout.write(f'  登录账号：{OWNER_PHONE} / {PASSWORD}（{OWNER_NICK}）、'
-                          f'{SPOUSE_PHONE} / {PASSWORD}（{SPOUSE_NICK}）')
+        owner = family.owner
+        if owner.username == OWNER_PHONE:
+            self.stdout.write(f'  登录账号：{OWNER_PHONE} / {PASSWORD}（{OWNER_NICK}）、'
+                              f'{SPOUSE_PHONE} / {PASSWORD}（{SPOUSE_NICK}）')
+        else:
+            self.stdout.write(f'  目标账号：{owner.username}'
+                              f'{"（" + owner.nickname + "）" if owner.nickname else ""}')
         self.stdout.write(f'  家庭：{family.name}')
         self.stdout.write(f'  账户：{len(accounts)} 个，总资产 ¥{total / 100:,.2f}')
         self.stdout.write(f'  流水：{tx.count()} 笔，收入 ¥{income / 100:,.2f}，支出 ¥{expense / 100:,.2f}')

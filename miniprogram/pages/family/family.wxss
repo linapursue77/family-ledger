@@ -187,6 +187,17 @@
   font-size: 26rpx;
   color: var(--primary);
 }
+/* 邀请分享按钮：button 自带边距/边框要清掉，和下方复制链接对齐 */
+.share-btn {
+  margin: 20rpx 0 16rpx;
+  padding: 20rpx 0;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  line-height: normal;
+}
+.share-btn::after {
+  border: none;
+}
 
 .action-item {
   padding: 28rpx 4rpx;

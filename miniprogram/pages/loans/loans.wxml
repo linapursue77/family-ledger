@@ -40,7 +40,7 @@
   </view>
 
   <!-- 列表 -->
-  <view wx:if="{{!items.length && !loading}}" class="empty">还没有借出借入记录</view>
+  <view wx:if="{{!items.length && !loading}}" class="empty">还没有借钱记录，点下面按钮记一笔</view>
 
   <view wx:for="{{items}}" wx:key="id" class="card loan-card">
     <view class="loan-head">
@@ -100,16 +100,16 @@
   <view wx:if="{{showAdd}}" class="sheet-mask" bindtap="closeAdd">
     <view class="sheet" catchtap>
       <view class="sheet-head">
-        <text class="sheet-title">记一笔借出 / 借入</text>
+        <text class="sheet-title">记一笔</text>
         <text class="sheet-close" bindtap="closeAdd">×</text>
       </view>
 
       <view class="mode-row">
         <view class="mode-btn {{form.direction === 'lend' ? 'active' : ''}}" bindtap="onLend">
-          我借出（别人欠我）
+          📤 我借给别人
         </view>
         <view class="mode-btn {{form.direction === 'borrow' ? 'active' : ''}}" bindtap="onBorrow">
-          我借入（我欠别人）
+          📥 我借进来
         </view>
       </view>
 
