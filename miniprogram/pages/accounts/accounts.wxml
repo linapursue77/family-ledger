@@ -158,15 +158,33 @@
         />
       </view>
 
-      <view wx:if="{{form.isInvest}}" class="field-row">
+      <view wx:if="{{form.isInvest}}" class="field-row profit-row">
         <text class="field-label">收益总额</text>
-        <input
-          type="digit"
-          placeholder="{{editing ? '当前累计收益，亏损填负数' : '不填则视为 0'}}"
-          value="{{form.profit}}"
-          data-field="profit"
-          bindinput="onInput"
-        />
+        <!-- 手机数字键盘没有负号，用「盈利 / 亏损」切换正负 -->
+        <view class="profit-main">
+          <view class="sign-row">
+            <view
+              class="sign-btn sign-plus {{!form.profitLoss ? 'on' : ''}}"
+              data-loss="0"
+              bindtap="onProfitSign"
+            >＋ 盈利</view>
+            <view
+              class="sign-btn sign-minus {{form.profitLoss ? 'on' : ''}}"
+              data-loss="1"
+              bindtap="onProfitSign"
+            >－ 亏损</view>
+          </view>
+          <view class="profit-input">
+            <text class="profit-sign">{{form.profitLoss ? '-¥' : '¥'}}</text>
+            <input
+              type="digit"
+              placeholder="{{editing ? '当前累计收益' : '不填则视为 0'}}"
+              value="{{form.profit}}"
+              data-field="profit"
+              bindinput="onInput"
+            />
+          </view>
+        </view>
       </view>
       <view wx:if="{{!editing}}" class="field-row">
         <text class="field-label">初始余额</text>

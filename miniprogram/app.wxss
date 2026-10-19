@@ -28,7 +28,8 @@ page {
 
 .card {
   background: var(--card);
-  border-radius: var(--radius);
+  /* ★ 之前写的 var(--radius) 未在 token 里定义，圆角会整体失效，改为 --radius-card */
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   border: 1rpx solid var(--border);
   padding: 28rpx;

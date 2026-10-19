@@ -39,6 +39,9 @@ const visibility = ref('shared')
 const balance = ref('')
 // 收益管理：勾选后可录入「收益总额」，本金 = 当前金额 − 收益
 const isInvest = ref(false)
+// 收益可以是负数（亏损），但手机数字键盘没有负号键，
+// 所以拆成「盈亏开关 + 只填数字」：开关决定正负，输入框只留绝对值
+const profitSign = ref(1)
 const profitInput = ref('')
 const saving = ref(false)
 let originalCardType = 'debit'
@@ -81,12 +84,30 @@ watch(
     isInvest.value = !!a?.is_invest
     // 回填收益：收益 = 现值 − 本金（本金未录过则留空，收益从 0 起算）
     // 注意方向别写反：存的是本金、显示的是收益，反了会让每次编辑把收益变号
-    profitInput.value =
+    const profit =
       a && a.is_invest && Number(a.principal_cents) > 0
-        ? String((Number(a.balance_cents) - Number(a.principal_cents)) / 100)
-        : ''
+        ? (Number(a.balance_cents) - Number(a.principal_cents)) / 100
+        : 0
+    // 亏了的话回填成负数，并把开关切到「亏损」，用户一眼能看出是亏
+    profitSign.value = profit < 0 ? -1 : 1
+    profitInput.value = Math.abs(profit) > 0.001 ? String(Math.abs(profit)) : ''
   }
 )
+
+// 直接敲负号（桌面端输入法有）时也认，落到的还是同一个开关，不会丢
+function onProfitInput(e) {
+  let v = String(e.target.value ?? '').trim()
+  if (v.startsWith('-')) {
+    profitSign.value = -1
+    v = v.slice(1)
+  } else if (v.startsWith('+')) {
+    v = v.slice(1)
+  }
+  v = v.replace(/[^\d.]/g, '')
+  profitInput.value = v
+  // 只填了非法字符时过滤结果没变化，v-model 不会回写，这里手动刷掉
+  e.target.value = v
+}
 
 // 介质选「投资理财」默认纳入收益管理，少一步操作
 watch(cardType, (v) => {
@@ -113,7 +134,8 @@ async function onSave() {
     // 收益留空时本金 = 当前金额，收益从 0 开始。
     if (isInvest.value) {
       const bal = Number(balance.value || 0)
-      const pf = profitInput.value === '' ? 0 : Number(profitInput.value)
+      // profitInput 存的是绝对值，正负由 profitSign 决定
+      const pf = profitInput.value === '' ? 0 : profitSign.value * Math.abs(Number(profitInput.value))
       if (!Number.isFinite(pf)) return toast('收益金额不正确')
       const principalVal = bal - pf
       if (principalVal < 0) return toast('收益不能大于当前金额')
@@ -262,12 +284,35 @@ async function onDelete() {
 
         <div v-if="isInvest" class="fld">
           <label class="fld-label">收益总额</label>
+          <!-- 数字键盘没有负号，用「盈利 / 亏损」切换正负，否则亏损根本填不进去 -->
+          <div class="sign-row">
+            <div
+              class="sign-btn sign-plus"
+              :class="{ on: profitSign === 1 }"
+              @click="profitSign = 1"
+            >
+              ＋ 盈利
+            </div>
+            <div
+              class="sign-btn sign-minus"
+              :class="{ on: profitSign === -1 }"
+              @click="profitSign = -1"
+            >
+              － 亏损
+            </div>
+          </div>
           <div class="money-input">
-            <span class="money-sign">¥</span>
-            <input v-model="profitInput" type="number" inputmode="decimal" placeholder="0.00" />
+            <span class="money-sign">{{ profitSign === -1 ? '-¥' : '¥' }}</span>
+            <input
+              :value="profitInput"
+              type="text"
+              inputmode="decimal"
+              placeholder="0.00"
+              @input="onProfitInput"
+            />
           </div>
           <div class="fld-tip">
-            目前累计赚的钱（亏损填负数）；投入本金 = 当前金额 − 收益
+            目前累计赚的钱；亏了就选「亏损」；投入本金 = 当前金额 − 收益
           </div>
         </div>
 
@@ -430,6 +475,34 @@ async function onDelete() {
   font-size: 11px;
   color: #b8b6ae;
   line-height: 1.5;
+}
+.sign-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sign-btn {
+  flex: 1;
+  text-align: center;
+  padding: 9px 0;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 0.5px solid #e8e8e8;
+  background: #fff;
+  color: #888780;
+  cursor: pointer;
+}
+.sign-plus.on {
+  background: #e1f5ee;
+  border-color: #1d9e75;
+  color: #0f6e56;
+  font-weight: 600;
+}
+.sign-minus.on {
+  background: #fcecec;
+  border-color: #e24b4a;
+  color: #a32d2d;
+  font-weight: 600;
 }
 .chip {
   flex: 1;

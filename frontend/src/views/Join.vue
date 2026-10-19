@@ -104,8 +104,12 @@ onMounted(() => {
     <div v-else-if="!auth.isLogin" class="card j-card">
       <div class="j-icon">🔑</div>
       <div class="j-title">需要登录后接受邀请</div>
-      <div class="j-desc">登录后即可查看邀请详情并加入家庭。</div>
-      <button class="btn btn-primary" @click="router.push('/login')">去登录</button>
+      <!-- 带上 invite：登录页据此把「注册」也接到邀请上，
+           否则新用户点注册会自己建家庭变成主账号，反过来卡住加入流程 -->
+      <div class="j-desc">已有账号可直接登录；没有账号点注册，注册后会自动加入这个家庭。</div>
+      <button class="btn btn-primary" @click="router.push(`/login?invite=${encodeURIComponent(token)}`)">
+        去登录 / 注册
+      </button>
       <button class="btn j-decline" @click="router.replace('/')">返回首页</button>
     </div>
 

@@ -14,7 +14,7 @@ SCHEDULES = [
         '每日账户余额快照',
         'apps.accounts.tasks.snapshot_all_accounts',
         Schedule.DAILY,
-        '资产净值曲线的数据源；每天刷新当月快照，月底定格',
+        '资产净值曲线的数据源；每天刷新当月快照，月底定格，并同步各账户的「上月余额」基准',
     ),
     (
         '每日周期记账',

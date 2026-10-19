@@ -1,87 +1,251 @@
 <view class="page">
+  <!--
+    分组结构与 H5 Mine.vue 一一对应：
+      用户卡 → 资产总览 → 账户管理 → 智能分析 → 信任规则
+      → 资金往来 → 家庭管理 → 其他
+    顺序、分组名、每项文案都对齐，改一端记得同步另一端。
+  -->
+
   <!-- 用户卡：未登录时整卡可点，作为登录入口 -->
-  <view class="card user-card" bindtap="onUserTap">
+  <view class="profile-card" bindtap="onUserTap">
     <view class="avatar">{{isLoggedIn ? (user.nickname ? user.nickname[0] : '财') : '👤'}}</view>
-    <view class="user-info">
-      <text class="user-name">{{isLoggedIn ? (user.nickname || '未设置昵称') : '点击登录'}}</text>
-      <text class="user-family text-muted">{{isLoggedIn ? (family.name || '我的家庭') : '登录后同步家庭账本'}}</text>
+    <view class="profile-info">
+      <text class="profile-name">{{isLoggedIn ? (user.nickname || '未设置昵称') : '点击登录'}}</text>
+      <text class="profile-bind">
+        {{isLoggedIn ? '👥 已绑定' + (family.name || '家庭') : '登录后同步家庭账本'}}
+      </text>
     </view>
     <text wx:if="{{!isLoggedIn}}" class="arrow">›</text>
   </view>
 
-  <!-- 账户列表 -->
-  <view class="card section">
-    <view class="section-head">
-      <text class="section-title">我的账户</text>
-      <text wx:if="{{isLoggedIn}}" class="add-btn" bindtap="openAdd">＋ 新增</text>
+  <!-- 资产总览：与 H5 的「我的资产 / 本月支出 / 本月结余」同口径 -->
+  <view class="overview">
+    <view class="ov-item">
+      <text class="ov-value">¥{{myAssets}}</text>
+      <text class="ov-label">我的资产</text>
     </view>
-    <block wx:if="{{isLoggedIn}}">
-    <view class="list-item" wx:for="{{accounts}}" wx:key="id">
-      <text class="acc-icon">{{item.icon}}</text>
-      <view class="acc-info">
-        <text class="acc-name">{{item.name}}</text>
-        <text class="acc-book text-muted">{{item.book_type}}</text>
+    <view class="ov-item">
+      <text class="ov-value text-expense">¥{{monthExpense}}</text>
+      <text class="ov-label">本月支出</text>
+    </view>
+    <view class="ov-item">
+      <text class="ov-value text-income">¥{{monthBalance}}</text>
+      <text class="ov-label">本月结余</text>
+    </view>
+  </view>
+
+  <!-- 账户管理 -->
+  <view class="menu-section">
+    <view class="menu-item" bindtap="goAccounts">
+      <text class="menu-icon">💳</text>
+      <text class="menu-text">账户管理</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <!--
+    智能分析：开关即配置入口（与 H5 一致）。
+    打开开关 → 直接展开模型配置表单，填完保存即启用；
+    关闭开关 → 配置区折叠，报告页自动回落本地规则分析。
+  -->
+  <view class="menu-section">
+    <view class="menu-title">智能分析</view>
+    <view class="menu-item">
+      <text class="menu-icon">🤖</text>
+      <view class="menu-main" bindtap="goReportAI">
+        <text class="menu-text">AI 智能分析</text>
+        <text wx:if="{{!aiAvailable}}" class="menu-desc">未配置大模型，当前用本地规则分析</text>
       </view>
-      <text class="acc-balance">¥{{item.balanceText}}</text>
+      <text class="menu-value">{{aiAvailable ? '已接入' : '本地分析'}}</text>
+      <!-- 打开态用绿色，与「已启用」语义对应；关闭时下方表单自动折叠 -->
+      <switch
+        class="ai-switch"
+        checked="{{showAiForm}}"
+        color="#1d9e75"
+        bindchange="onAiToggle"
+      />
     </view>
-    <view wx:if="{{!accounts.length}}" class="empty">暂无账户，点击右上角新增</view>
-    </block>
-    <view wx:else class="empty">登录后查看我的账户</view>
+
+    <!-- 配置表单：开开关即展开，关开关即收起 -->
+    <view wx:if="{{showAiForm}}" class="sub-form">
+      <view class="field-row">
+        <text class="field-label">服务商</text>
+        <picker
+          mode="selector"
+          range="{{aiProviders}}"
+          range-key="label"
+          value="{{aiProviderIndex}}"
+          bindchange="onAiProvider"
+        >
+          <view class="picker-value">{{aiProviders[aiProviderIndex].label}} ›</view>
+        </picker>
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">模型</text>
+        <input
+          value="{{aiModel}}"
+          placeholder="如 deepseek-chat"
+          bindinput="onAiModel"
+        />
+      </view>
+
+      <!-- 自定义服务商才需要手填地址 -->
+      <view wx:if="{{aiProviders[aiProviderIndex].value === 'custom'}}" class="field-row">
+        <text class="field-label">接口地址</text>
+        <input
+          value="{{aiBaseUrl}}"
+          placeholder="https://…/v1/chat/completions"
+          bindinput="onAiBaseUrl"
+        />
+      </view>
+
+      <view class="field-row">
+        <text class="field-label">API Key</text>
+        <input
+          password
+          value="{{aiApiKey}}"
+          placeholder="{{aiHasKey ? '已保存，留空则不修改' : '粘贴你的 API Key'}}"
+          bindinput="onAiApiKey"
+        />
+      </view>
+
+      <view wx:if="{{aiMsg}}" class="form-msg">{{aiMsg}}</view>
+
+      <view class="ai-actions">
+        <button
+          class="btn-secondary ai-btn"
+          bindtap="onTestAi"
+          loading="{{aiTesting}}"
+        >测试连接</button>
+        <button
+          class="btn-primary ai-btn {{aiSaving ? 'disabled' : ''}}"
+          bindtap="onSaveAi"
+        >{{aiSaving ? '保存中…' : '保存并启用'}}</button>
+      </view>
+
+      <view class="form-note">
+        Key 只保存在家庭配置里，接口只回显掩码。填好后报告页的「智能分析」会自动切到 AI 结论；
+        关掉开关则回到本地规则分析。
+      </view>
+    </view>
   </view>
 
-  <!-- 更多功能 -->
-  <view class="card section">
-    <view class="section-head">
-      <text class="section-title">更多功能</text>
+  <!-- 信任规则 -->
+  <view class="menu-section">
+    <view class="menu-title">信任规则</view>
+    <view class="menu-item" bindtap="goThreshold">
+      <text class="menu-icon">💰</text>
+      <text class="menu-text">协商阈值</text>
+      <text class="menu-value">{{thrText}}</text>
+      <text class="menu-arrow">›</text>
     </view>
-    <view class="list-item" bindtap="goAccounts">
-      <text class="acc-icon">🏦</text>
-      <text class="acc-name">账户管理</text>
-      <text class="arrow">›</text>
+    <view class="menu-item" bindtap="togglePrivacy">
+      <text class="menu-icon">🔐</text>
+      <text class="menu-text">隐私额度</text>
+      <text class="menu-value">{{privacyText}}</text>
+      <text class="menu-arrow">{{showPrivacy ? '⌃' : '›'}}</text>
     </view>
-    <view class="list-item" bindtap="goLoans">
-      <text class="acc-icon">🤝</text>
-      <text class="acc-name">借钱来往</text>
-      <text class="arrow">›</text>
+    <!-- 隐私额度：与 H5 同一套快捷档 + 输入，只对本人生效 -->
+    <view wx:if="{{showPrivacy}}" class="sub-form">
+      <view class="quota-chips">
+        <text
+          wx:for="{{privacyPresets}}"
+          wx:key="*this"
+          class="qchip {{privacyYuan == item ? 'on' : ''}}"
+          data-val="{{item}}"
+          bindtap="onPrivacyPreset"
+        >¥{{item}}</text>
+      </view>
+      <view class="field-row">
+        <text class="field-label">每月私密额度（元）</text>
+        <input
+          type="number"
+          value="{{privacyYuan}}"
+          bindinput="onPrivacyInput"
+        />
+      </view>
+      <view wx:if="{{privacyMsg}}" class="form-msg">{{privacyMsg}}</view>
+      <button class="btn-primary {{privacySaving ? 'disabled' : ''}}" bindtap="onSavePrivacy">
+        {{privacySaving ? '保存中…' : '保存'}}
+      </button>
+      <view class="form-note">
+        标记为私密的支出，每月累计在额度以内对方完全看不到；超出部分会自动计入共同支出。
+        额度 ¥100 ~ ¥5000，只对本人生效，保存后当月立即按新额度计算。
+      </view>
     </view>
-    <view class="list-item" bindtap="goReturns">
-      <text class="acc-icon">📈</text>
-      <text class="acc-name">收益管理</text>
-      <text class="arrow">›</text>
+  </view>
+
+  <!-- 资金往来 -->
+  <view class="menu-section">
+    <view class="menu-title">资金往来</view>
+    <view class="menu-item" bindtap="goLoans">
+      <text class="menu-icon">🤝</text>
+      <text class="menu-text">借钱来往</text>
+      <text class="menu-value">{{loanText}}</text>
+      <text class="menu-arrow">›</text>
     </view>
-    <!-- 定时记账：与 H5 入口同名同位置 -->
-    <view class="list-item" bindtap="goRecurring">
-      <text class="acc-icon">⏰</text>
-      <text class="acc-name">定时记账</text>
-      <text class="item-value">{{recText}}</text>
-      <text class="arrow">›</text>
+    <view class="menu-item" bindtap="goReturns">
+      <text class="menu-icon">📈</text>
+      <text class="menu-text">收益管理</text>
+      <text class="menu-value">{{retText || '未开启'}}</text>
+      <text class="menu-arrow">›</text>
     </view>
-    <view class="list-item" bindtap="goFamily">
-      <text class="acc-icon">🏠</text>
-      <text class="acc-name">家庭管理</text>
-      <text class="arrow">›</text>
+    <view class="menu-item" bindtap="goRecurring">
+      <text class="menu-icon">⏰</text>
+      <text class="menu-text">定时记账</text>
+      <text class="menu-value">{{recText}}</text>
+      <text class="menu-arrow">›</text>
     </view>
-    <view class="list-item" bindtap="goImport">
-      <text class="acc-icon">📥</text>
-      <text class="acc-name">账单导入</text>
-      <text class="arrow">›</text>
+  </view>
+
+  <!-- 家庭管理 -->
+  <view class="menu-section">
+    <view class="menu-title">家庭管理</view>
+    <!-- 「邀请成员」与「家庭成员」都落在 family 页，合并为一行，
+         邀请作为成员管理里的操作，不再单独占一个入口 -->
+    <view class="menu-item" bindtap="goFamily">
+      <text class="menu-icon">👥</text>
+      <text class="menu-text">家庭成员与邀请</text>
+      <text class="menu-value">{{inviteText === '已满' ? '已满' : memberCountText}}</text>
+      <text class="menu-arrow">›</text>
     </view>
-    <!-- 分享给好友：必须真 button，微信只认 open-type="share" 拉起会话面板。
-         与主包/-pc2 的 H5「分享给好友」入口同名同位置 -->
-    <button class="list-item share-item" open-type="share" hover-class="share-hover">
-      <text class="acc-icon">📢</text>
-      <text class="acc-name">分享给好友</text>
-      <text class="arrow">›</text>
+    <view class="menu-item" bindtap="goOwner">
+      <text class="menu-icon">👑</text>
+      <text class="menu-text">主账号设置</text>
+      <text class="menu-value">{{ownerText}}</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 其他 -->
+  <view class="menu-section">
+    <view class="menu-title">其他</view>
+    <!-- 分享给好友：必须真 button，微信只认 open-type="share" 拉起会话面板 -->
+    <button class="menu-item share-item" open-type="share" hover-class="share-hover">
+      <text class="menu-icon">📢</text>
+      <text class="menu-text">分享给好友</text>
+      <text class="menu-arrow">›</text>
     </button>
-  </view>
-
-  <!-- 登录密码：微信一键登录的账号默认没有密码，设置后可在网页版登录（仅登录后展示） -->
-  <view wx:if="{{isLoggedIn}}" class="card section">
-    <view class="section-head" bindtap="openPwd">
-      <text class="section-title">🔑 {{pwdTitle}}</text>
-      <text class="add-btn">{{pwdText}}</text>
+    <view class="menu-item" bindtap="goImport">
+      <text class="menu-icon">📥</text>
+      <text class="menu-text">账单导入</text>
+      <text class="menu-arrow">›</text>
     </view>
-    <view wx:if="{{showPwd}}" class="pwd-form">
+    <!-- 导出账单：小程序没有浏览器下载，如实告知走网页版 -->
+    <view class="menu-item" bindtap="tipExport">
+      <text class="menu-icon">📤</text>
+      <text class="menu-text">导出账单</text>
+      <text class="menu-value">CSV · 网页版</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="openPwd">
+      <text class="menu-icon">🔑</text>
+      <text class="menu-text">{{pwdTitle}}</text>
+      <text class="menu-value">{{pwdText}}</text>
+      <text class="menu-arrow">{{showPwd ? '⌃' : '›'}}</text>
+    </view>
+    <view wx:if="{{showPwd}}" class="sub-form">
       <view wx:if="{{hasPassword}}" class="field-row">
         <text class="field-label">当前密码</text>
         <input password placeholder="请输入当前密码" value="{{pwdOld}}" bindinput="onPwdOld" />
@@ -97,45 +261,16 @@
       <button class="btn-primary {{pwdSaving ? 'disabled' : ''}}" bindtap="onSavePwd">
         {{pwdSaving ? '保存中…' : '保存'}}
       </button>
-      <view class="pwd-note">用微信登录的账号默认没有密码，设置后即可用「手机号 + 密码」在网页版登录。</view>
+      <view class="form-note">
+        用微信登录的账号默认没有密码，设置后即可用「手机号 + 密码」在网页版登录。
+      </view>
+    </view>
+    <view wx:if="{{isLoggedIn}}" class="menu-item" bindtap="onLogout">
+      <text class="menu-icon">🚪</text>
+      <text class="menu-text text-expense">退出登录</text>
+      <text class="menu-arrow">›</text>
     </view>
   </view>
 
-  <view wx:if="{{isLoggedIn}}" class="logout-area">
-    <button class="btn-logout" bindtap="onLogout">退出登录</button>
-  </view>
-  <view wx:else class="guest-tip">先随便逛逛，数据都在登录后等你 👋</view>
-
-  <!-- 新增账户弹窗 -->
-  <view wx:if="{{showAdd}}" class="sheet-mask" bindtap="closeAdd">
-    <view class="sheet" catchtap>
-      <view class="sheet-head">
-        <text class="sheet-title">新增账户</text>
-        <text class="sheet-close" bindtap="closeAdd">×</text>
-      </view>
-      <view class="field-row">
-        <text class="field-label">名称</text>
-        <input placeholder="如：招商银行" value="{{newName}}" bindinput="onName" />
-      </view>
-      <view class="field-row">
-        <text class="field-label">类型</text>
-        <picker range="{{accountTypes}}" range-key="label" value="{{newTypeIndex}}" bindchange="onType">
-          <view class="field-value">{{accountTypes[newTypeIndex].label}} ›</view>
-        </picker>
-      </view>
-      <view class="field-row">
-        <text class="field-label">账本</text>
-        <picker range="{{bookTypes}}" range-key="label" value="{{newBookIndex}}" bindchange="onBook">
-          <view class="field-value">{{bookTypes[newBookIndex].label}} ›</view>
-        </picker>
-      </view>
-      <view class="field-row">
-        <text class="field-label">余额</text>
-        <input type="digit" placeholder="0.00" value="{{newBalance}}" bindinput="onBalance" />
-      </view>
-      <button class="btn-primary {{saving ? 'disabled' : ''}}" bindtap="onSaveAccount">
-        {{saving ? '保存中…' : '保存'}}
-      </button>
-    </view>
-  </view>
+  <view wx:if="{{!isLoggedIn}}" class="guest-tip">先随便逛逛，数据都在登录后等你 👋</view>
 </view>

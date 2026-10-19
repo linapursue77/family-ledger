@@ -47,7 +47,11 @@
         />
       </view>
       <view class="an-sep"></view>
-      <view class="an-date {{showDatePanel ? 'on' : ''}}" bindtap="toggleDatePanel">📅 {{shortDate}}</view>
+      <!-- 日期胶囊：与账本/账户 chips 同一套样式，点开展开自绘日历 -->
+      <view class="an-date {{showDatePanel ? 'on' : ''}}" bindtap="toggleDatePanel">
+        <text class="an-date-tx">{{dateDisplay}}</text>
+        <view class="an-date-ic"></view>
+      </view>
     </view>
   </view>
 
@@ -110,16 +114,16 @@
     </view>
   </view>
 
-  <!-- 账户：横向 chips，选中高亮 -->
+  <!-- 账户：只列我名下的账户，横向 chips，选中高亮 -->
   <view class="account-bar">
     <view
-      wx:for="{{visibleAccounts}}"
+      wx:for="{{accountChoices}}"
       wx:key="id"
       class="q-chip acct {{accountId === item.id ? 'on' : ''}}"
       data-id="{{item.id}}"
       bindtap="onAccountPick"
     >{{item.icon}} {{item.name}}</view>
-    <view wx:if="{{!visibleAccounts.length}}" class="q-chip">💳 这本账下还没有账户</view>
+    <view wx:if="{{!accountChoices.length}}" class="q-chip">💳 这本账下还没有你的账户</view>
   </view>
 
   <!-- 按钮 -->

@@ -11,15 +11,25 @@ class AccountSerializer(serializers.ModelSerializer):
     profit = serializers.SerializerMethodField()
     profit_cents = serializers.SerializerMethodField()
     profit_rate = serializers.SerializerMethodField()
+    # ★ 账户是否属于当前登录用户。记账页要按「只记我名下的账户」过滤，
+    #   但出于隐私不暴露 user_id，只回一个布尔值，前端据此筛选即可。
+    is_mine = serializers.SerializerMethodField()
 
     class Meta:
         model = Account
         fields = ['id', 'name', 'icon', 'type', 'card_type', 'book_type', 'balance',
                   'balance_cents', 'last_balance_cents', 'bank_name', 'account_no',
                   'is_count_total', 'is_invest', 'principal_cents', 'principal',
-                  'profit_cents', 'profit', 'profit_rate',
+                  'profit_cents', 'profit', 'profit_rate', 'is_mine',
                   'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_is_mine(self, obj) -> bool:
+        request = self.context.get('request')
+        viewer = getattr(request, 'user', None)
+        if not viewer or not getattr(viewer, 'is_authenticated', False):
+            return False
+        return str(obj.user_id) == str(viewer.id)
 
     def get_balance(self, obj) -> float:
         return round(obj.balance_cents / 100, 2)

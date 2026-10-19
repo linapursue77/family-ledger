@@ -35,17 +35,49 @@ function bookName(type) {
   return auth.family?.book_labels?.[type] || DEFAULT_BOOK[type] || type
 }
 /**
- * 只保留真实存在过账户的账本：系统固定三本账，
- * 但家庭不一定每本都建了账户，没建的不该出现在选择里。
+ * 可记账的账户：只保留「我名下」的账户。
+ * 后端 AccountSerializer 回 is_mine（不暴露 user_id，隐私更稳），
+ * 记账只能落到自己的账户上，对方名下的账户即便可见也不该出现在这里。
+ */
+const myAccounts = computed(() => accounts.value.filter((a) => a.is_mine !== false))
+/**
+ * 可选的账本：只出现「我的账本 + 共同账本」。
+ * 对方专属账本（如我属 husband、对方属 wife）整本不进选择，
+ * 避免在自己账号体系下误选到对方的账本。
  */
 const existingBooks = computed(() => {
-  const used = new Set(accounts.value.map((a) => a.book_type))
-  return BOOK_ORDER.filter((b) => used.has(b))
+  const used = new Set(myAccounts.value.map((a) => a.book_type))
+  return BOOK_ORDER.filter((b) => {
+    // 只留「我的账本」与「共同账本」，对方专属账本一律不出现
+    if (b !== 'shared' && b !== myBook.value) return false
+    // 且必须真的建过账户，没建的空账本不占位置
+    return used.has(b)
+  })
+})
+/**
+ * 账本 chips 实际渲染的列表：可选账本之外，把「编辑中的老账单所属账本」补进来。
+ * 否则老账单落在已不可选的账本时，chips 里没有选中项，用户会以为没选账本。
+ */
+const bookChoices = computed(() => {
+  const list = [...existingBooks.value]
+  if (bookType.value && !list.includes(bookType.value)) list.push(bookType.value)
+  return list
 })
 /** 当前账本下的账户；账本为空表示不过滤 */
 const visibleAccounts = computed(() =>
-  bookType.value ? accounts.value.filter((a) => a.book_type === bookType.value) : accounts.value,
+  bookType.value
+    ? myAccounts.value.filter((a) => a.book_type === bookType.value)
+    : myAccounts.value,
 )
+/** 编辑态下账户可能不在我的账户里（老数据），兜底保留原账户，避免保存时被清空 */
+const accountChoices = computed(() => {
+  const list = [...visibleAccounts.value]
+  if (accountId.value && !list.some((a) => a.id === accountId.value)) {
+    const origin = accounts.value.find((a) => a.id === accountId.value)
+    if (origin) list.push(origin)
+  }
+  return list
+})
 const amount = ref('')
 const merchant = ref('')
 const description = ref('')
@@ -184,14 +216,14 @@ async function loadAccounts() {
     const d = await accountApi.list()
     accounts.value = d.items || d || []
     // 账本默认跟随登录身份：优先我自己的账本，自己名下没账户再退到共同账本
-    if (!bookType.value) {
+    if (!bookType.value || !existingBooks.value.includes(bookType.value)) {
       const preferred = [myBook.value, 'shared', ...BOOK_ORDER]
       bookType.value =
-        preferred.find((b) => accounts.value.some((a) => a.book_type === b)) ||
-        (accounts.value[0]?.book_type ?? 'shared')
+        preferred.find((b) => visibleAccounts.value.some((a) => a.book_type === b)) ||
+        (existingBooks.value[0] ?? 'shared')
     }
     // 「智能推荐」：默认选中该账本第一个账户，避免漏选导致流水没有归属账户
-    const pool = visibleAccounts.value.length ? visibleAccounts.value : accounts.value
+    const pool = visibleAccounts.value.length ? visibleAccounts.value : myAccounts.value
     if (pool.length && !accountId.value) {
       accountId.value = pool[0].id
     }
@@ -209,6 +241,12 @@ function onBook(type) {
 const shortDate = computed(() =>
   txDate.value === todayStr.value ? '今天' : dayjs(txDate.value).format('M月D日'),
 )
+/**
+ * 日期框里显示的完整日期，对齐原生日期控件的「YYYY/MM/DD」写法。
+ * 不再用「今天/昨天」这类相对词：日期框本身就该是确定值，
+ * 相对描述留给下方提示条，避免同一处出现两种日期语言。
+ */
+const dateDisplay = computed(() => dayjs(txDate.value).format('YYYY/MM/DD'))
 function onType(t) {
   activeType.value = t
   categoryId.value = ''
@@ -235,6 +273,8 @@ async function loadEditing() {
     await loadAccounts()
     const acc = accounts.value.find((a) => a.id === t.account_id)
     if (acc) {
+      // 老账单若落在对方账本（现在已不可选），账本 chips 里不会有它，
+      // 但编辑必须保留原归属，否则一保存就把账户/账本改掉了（见 bookChoices）
       bookType.value = acc.book_type
       accountId.value = acc.id
     }
@@ -341,7 +381,12 @@ onMounted(async () => {
           <input v-model="amount" type="number" class="amount-input" placeholder="0.00" />
         </div>
         <span class="an-sep"></span>
-        <span class="an-date" @click="openDatePanel">📅 {{ shortDate }}</span>
+        <!-- 日期胶囊：与账本/账户 chips 同一套样式，
+             点一下仍走自绘日历，选中即生效，不额外加「确定」 -->
+        <div class="an-date" :class="{ on: showDatePanel }" @click="openDatePanel">
+          <span class="an-date-tx">{{ dateDisplay }}</span>
+          <i class="an-date-ic"></i>
+        </div>
       </div>
     </div>
 
@@ -392,10 +437,10 @@ onMounted(async () => {
         </div>
       </div>
 
-    <!-- 账本：只展示家庭里真实建过的账本，默认选中当前身份所属的那本 -->
+    <!-- 账本：只展示「我的账本 + 共同账本」，对方专属账本不出现 -->
     <div class="quick-bar">
       <div
-        v-for="b in existingBooks"
+        v-for="b in bookChoices"
         :key="b"
         class="q-chip"
         :class="{ on: bookType === b }"
@@ -408,10 +453,10 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 账户：横向 chips，选中高亮 -->
+    <!-- 账户：只列我名下的账户，横向 chips，选中高亮 -->
     <div class="account-bar">
       <div
-        v-for="a in visibleAccounts"
+        v-for="a in accountChoices"
         :key="a.id"
         class="q-chip acct"
         :class="{ on: accountId === a.id }"
@@ -419,7 +464,7 @@ onMounted(async () => {
       >
         {{ a.icon }} {{ a.name }}
       </div>
-      <div v-if="!visibleAccounts.length" class="q-chip">💳 这本账下还没有账户</div>
+      <div v-if="!accountChoices.length" class="q-chip">💳 这本账下还没有你的账户</div>
     </div>
 
     <!-- 按钮 -->
@@ -548,15 +593,48 @@ onMounted(async () => {
   border-color: #7f77dd;
   color: #534ab7;
 }
+/*
+ * 日期胶囊：与页内账本 / 账户 chips 同一套语言（浅灰底 + 全圆角 + 深灰字），
+ * 不再做成「白底细边输入框」——那种方框浮在圆角卡片里像原生控件，很跳。
+ */
 .an-date {
   flex: none;
-  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
   border-radius: 999px;
   background: #f1efe8;
-  font-size: 12px;
-  color: #5f5e5a;
+  font-size: 13px;
+  color: #2c2c2a;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+/* 日期数字等宽，切换日期时胶囊宽度不跳动 */
+.an-date-tx {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+/* 日历图标：纯 CSS 画的实心小方块，比字符图标清楚，也不引图标库 */
+.an-date-ic {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 2px;
+  border: 1.5px solid #888780;
+  /* 顶部加粗画出「日历头」，一眼能认出是日历 */
+  border-top-width: 4px;
+}
+/* 展开态：整颗变浅紫 + 主色字，与 chips 的选中态一致 */
+.an-date.on {
+  background: #eeedfe;
+  color: #534ab7;
+  font-weight: 600;
+}
+.an-date.on .an-date-ic {
+  border-color: #7f77dd;
 }
 .an-amount {
   flex: 1;

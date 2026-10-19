@@ -17,6 +17,11 @@ class RegisterSerializer(serializers.Serializer):
     book_type = serializers.ChoiceField(
         choices=['husband', 'wife'], required=False, default='husband'
     )
+    # 邀请注册：带上邀请码时不再建自己的家庭，而是直接加入邀请方家庭。
+    # 不校验内容，有效性交给 get_invitation 统一判断（无效时不建用户）。
+    invite_token = serializers.CharField(
+        required=False, allow_blank=True, default='', max_length=128
+    )
 
     def validate_phone(self, value):
         if not PHONE_RE.match(value):

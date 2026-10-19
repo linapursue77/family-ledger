@@ -20,6 +20,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.accounts.views import book_labels
 from apps.core.response import BusinessError, api_response
 from apps.families.models import Family, FamilyMember, Threshold
+from apps.families.services import get_invitation, join_family_by_invitation
 from apps.membership import pay as wxpay
 from apps.users import sms_services
 from apps.users.models import SmsCode, User
@@ -97,7 +98,13 @@ def _me_payload(user: User) -> dict:
 
 
 class RegisterView(APIView):
-    """注册：自动创建家庭并成为主账号。"""
+    """注册。
+
+    ★ 带 invite_token 时是「被邀请人注册」：不再建自己的家庭，直接加入邀请方的家庭，
+      角色为普通成员。否则被邀请人会在注册时变成自己家庭的主账号，
+      之后接受邀请被「已在家庭中」拦住——这就是邀请链接注册变成主账号的原因。
+    不带 invite_token 时保持原行为：建家庭并成为主账号。
+    """
 
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -109,17 +116,37 @@ class RegisterView(APIView):
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
 
+        invite_token = str(data.get('invite_token') or '').strip()
+        # 邀请码先校验一遍：无效/过期就别建用户，免得留下一个无法使用的空账号
+        if invite_token:
+            get_invitation(invite_token)
+
         user = User.objects.create_user(
             username=data['phone'],
             password=data['password'],
             phone=data['phone'],
             nickname=data.get('nickname') or data['phone'][-4:],
         )
-        _create_family_for(user, data.get('book_type'))
+
+        joined = None
+        try:
+            if invite_token:
+                result = join_family_by_invitation(user, invite_token)
+                joined = {'family_name': result['family_name'],
+                          'book_type': result['book_type']}
+            else:
+                _create_family_for(user, data.get('book_type'))
+        except Exception:
+            # 建家庭/加入失败就回滚用户，避免出现没有家庭的半成品账号
+            user.delete()
+            raise
 
         return api_response(
-            {'user': UserSerializer(user).data, 'token': _issue_token(user)},
-            message='注册成功',
+            {'user': UserSerializer(user).data,
+             'token': _issue_token(user),
+             # 前端据此提示「已加入 X 家庭」，不需要再多调一次接口
+             'joined': joined},
+            message=('已加入「%s」' % joined['family_name']) if joined else '注册成功',
             http_status=status.HTTP_201_CREATED,
         )
 

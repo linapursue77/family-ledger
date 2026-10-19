@@ -1,68 +1,291 @@
-<view class="page">
-  <scroll-view scroll-x class="preset-bar" enhanced show-scrollbar="{{false}}">
-    <view
+<view class="page report-page">
+  <!-- 顶部：标题 + 当前区间 -->
+  <view class="navbar">
+    <text class="navbar-title">收支报告</text>
+    <text class="range-text">{{range.start}} ~ {{range.end}}</text>
+  </view>
+
+  <!--
+    首屏只保留「周期 → 收支切换 → 汇总 → 智能分析」。
+    原来周期、账户两组 chip 上下堆叠，加上 340rpx 的高汇总卡，
+    首屏一半都被筛选条吃掉；现在账户筛选移到汇总卡下方，
+    并把收支切换收进汇总卡内部，首屏能完整看到核心数字。
+  -->
+  <view class="chip-row">
+    <text
       wx:for="{{presets}}"
       wx:key="key"
-      class="chip {{activePreset === item.key ? 'active' : ''}}"
+      class="chip {{preset === item.key ? 'active' : ''}}"
       data-key="{{item.key}}"
       bindtap="onPreset"
-    >{{item.label}}</view>
-  </scroll-view>
-
-  <block wx:if="{{ov}}">
-    <view class="card summary-card">
-      <view class="summary-head">
-        <text class="summary-title">收支概览</text>
-        <text class="text-muted">{{ov.range.label}}</text>
-      </view>
-      <view class="summary-grid">
-        <view class="summary-item">
-          <text class="summary-label">收入</text>
-          <text class="summary-num text-income">¥{{ov.income}}</text>
-        </view>
-        <view class="summary-item">
-          <text class="summary-label">支出</text>
-          <text class="summary-num text-expense">¥{{ov.expense}}</text>
-        </view>
-        <view class="summary-item">
-          <text class="summary-label">结余</text>
-          <text class="summary-num">¥{{ov.balance}}</text>
-        </view>
-        <view class="summary-item">
-          <text class="summary-label">储蓄率</text>
-          <text class="summary-num text-primary">{{ov.saving_rate}}%</text>
-        </view>
-      </view>
-    </view>
-
-    <view class="card section">
-      <view class="section-title">支出分类</view>
-      <view class="cat-row" wx:for="{{ov.expense_categories}}" wx:key="id">
-        <view class="cat-dot" style="background: {{item.color}}"></view>
-        <text class="cat-name">{{item.name}}</text>
-        <text class="cat-pct">{{item.percent}}%</text>
-        <text class="cat-amount">¥{{item.amount}}</text>
-      </view>
-      <view wx:if="{{!ov.expense_categories.length}}" class="empty">暂无支出</view>
-    </view>
-
-    <view class="card section">
-      <view class="section-title">收入分类</view>
-      <view class="cat-row" wx:for="{{ov.income_categories}}" wx:key="id">
-        <view class="cat-dot" style="background: {{item.color}}"></view>
-        <text class="cat-name">{{item.name}}</text>
-        <text class="cat-pct">{{item.percent}}%</text>
-        <text class="cat-amount">¥{{item.amount}}</text>
-      </view>
-      <view wx:if="{{!ov.income_categories.length}}" class="empty">暂无收入</view>
-    </view>
-  </block>
-
-  <view wx:elif="{{needLogin}}" class="empty login-empty">
-    <view class="login-lock">🔒</view>
-    <view class="login-text">登录后查看收支报告与趋势分析</view>
-    <button class="login-btn" bindtap="goLogin">立即登录</button>
+    >{{item.label}}</text>
   </view>
-  <view wx:elif="{{loading}}" class="empty">加载中…</view>
-  <view wx:else class="empty">暂无数据</view>
+
+  <!-- 汇总卡：卡内顶部放「支出 / 收入」切换，省掉一条独立的切换栏 -->
+  <view class="card hero {{isExpense ? 'hero-expense' : 'hero-income'}}">
+    <view class="hero-tabs">
+      <text
+        class="hero-tab {{isExpense ? 'on' : ''}}"
+        data-key="expense"
+        bindtap="onType"
+      >支出</text>
+      <text
+        class="hero-tab {{isExpense ? '' : 'on'}}"
+        data-key="income"
+        bindtap="onType"
+      >收入</text>
+    </view>
+    <view class="hero-amount">¥{{summary.total}}</view>
+    <view class="hero-sub">{{range.label}} · {{scopeName}} · {{summary.count}} 笔</view>
+    <view class="hero-stats">
+      <view class="stat">
+        <text class="stat-b">¥{{summary.avg_daily}}</text>
+        <text class="stat-l">日均</text>
+      </view>
+      <view class="stat">
+        <text class="stat-b">¥{{perAvgText}}</text>
+        <text class="stat-l">笔均</text>
+      </view>
+      <view class="stat">
+        <text wx:if="{{isExpense}}" class="stat-b">{{summary.expense_of_income}}%</text>
+        <text wx:else class="stat-b">{{summary.saving_rate}}%</text>
+        <text class="stat-l">{{isExpense ? '占收入' : '储蓄率'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!--
+    账户范围：只在真有账户时才占一行。
+    放在汇总卡之后，首屏先看数字，想细看再滑一点选账户。
+  -->
+  <view wx:if="{{filterableAccounts.length}}" class="chip-row account-row">
+    <text class="chip {{accountId ? '' : 'active'}}" data-id="" bindtap="onAccount">全部账户</text>
+    <text
+      wx:for="{{filterableAccounts}}"
+      wx:key="account_id"
+      class="chip {{accountId === item.account_id ? 'active' : ''}}"
+      data-id="{{item.account_id}}"
+      bindtap="onAccount"
+    >{{item.icon}} {{item.name}}</text>
+  </view>
+
+  <!-- 当前账户收支：筛选到具体账户时才出现，紧跟账户 chips，不打断阅读 -->
+  <view wx:if="{{accountId}}" class="card acc-card">
+    <view class="acc-summary">
+      <view class="as-item">
+        <text class="as-label">收入</text>
+        <text class="as-val text-income">¥{{summary.income}}</text>
+      </view>
+      <view class="as-item">
+        <text class="as-label">支出</text>
+        <text class="as-val text-expense">¥{{summary.expense}}</text>
+      </view>
+      <view class="as-item">
+        <text class="as-label">结余</text>
+        <text class="as-val">¥{{summary.balance}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!--
+    智能分析：首屏只放「健康分 + 一句话结论 + 前两条洞察」，
+    其余折叠，避免一张卡把整屏撑满。
+  -->
+  <view class="card insight-card">
+    <view class="sec-title">
+      <text>智能分析</text>
+      <text class="insight-sub">{{insightSource}}</text>
+    </view>
+
+    <view class="ai-bar">
+      <text class="ai-tip">
+        {{aiAvailable ? '已接入大模型，可切换分析方式' : '未配置大模型，当前使用本地规则分析'}}
+      </text>
+      <view
+        class="ai-switch {{useAI && aiAvailable ? 'on' : ''}} {{aiAvailable ? '' : 'off'}}"
+        bindtap="toggleAI"
+      >
+        <text class="ai-dot"></text>
+        <text class="ai-word">{{useAI && aiAvailable ? 'AI' : '本地'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{insightLoading && !insight}}" class="insight-loading">
+      {{useAI && aiAvailable ? 'AI 分析中…' : '正在分析…'}}
+    </view>
+    <view wx:elif="{{insightError}}" class="insight-error">
+      {{insightError}}<text class="retry" bindtap="loadInsight">重试</text>
+    </view>
+    <block wx:elif="{{insight}}">
+      <view class="insight-hero">
+        <view class="score-ring" style="background: {{scoreRing}}">
+          <view class="score-inner">
+            <text class="score-num">{{insight.score == null ? '--' : insight.score}}</text>
+            <text class="score-unit">分</text>
+          </view>
+        </view>
+        <view class="insight-hero-main">
+          <view class="score-label">财务健康度 · {{insight.score_label}}</view>
+          <view class="score-text">{{insight.summary_text}}</view>
+        </view>
+      </view>
+      <view wx:if="{{insight.prev_range}}" class="insight-cmp">
+        环比基准 {{insight.prev_range.start}} ~ {{insight.prev_range.end}}
+      </view>
+      <view
+        wx:for="{{insightShown}}"
+        wx:for-item="i"
+        wx:key="title"
+        class="insight-item lv-{{i.level}}"
+      >
+        <text class="ins-ic">{{i.icon}}</text>
+        <view class="ins-main">
+          <view class="ins-title">{{i.title}}</view>
+          <view class="ins-detail">{{i.detail}}</view>
+          <view class="ins-sug">建议：{{i.suggestion}}</view>
+        </view>
+      </view>
+      <!-- 折叠开关：洞察多的时候别一口气铺满一屏 -->
+      <view
+        wx:if="{{insight.insights.length > 2}}"
+        class="insight-more"
+        bindtap="toggleInsightMore"
+      >{{insightMore ? '收起' : '展开全部 ' + insight.insights.length + ' 条'}}</view>
+    </block>
+  </view>
+
+  <!-- 分类占比 + 明细 -->
+  <view class="card">
+    <view class="sec-title"><text>{{typeLabel}}分类明细</text></view>
+    <view wx:if="{{categories.length}}" class="pie-row">
+      <view class="donut" style="background: {{donut}}">
+        <view class="donut-hole">
+          <text class="donut-total">¥{{summary.total}}</text>
+        </view>
+      </view>
+      <view class="mini-legend">
+        <view
+          wx:for="{{categories}}"
+          wx:key="category_id"
+          class="legend-row"
+        >
+          <text class="legend-name">{{item.icon}} {{item.name}}</text>
+          <text class="legend-pct">{{item.percent}}%</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{!categories.length}}" class="empty-sm">该区间暂无{{typeLabel}}记录</view>
+    <view
+      wx:for="{{categories}}"
+      wx:key="category_id"
+      class="cat-row"
+      data-id="{{item.category_id}}"
+      bindtap="openCat"
+    >
+      <text class="cat-icon" style="background: {{item.bg}}; color: {{item.color}}">{{item.icon}}</text>
+      <view class="cat-main">
+        <view class="cat-line">
+          <text class="cat-name">{{item.name}}</text>
+          <text class="cat-right">
+            <text class="cat-amt">¥{{item.amount}}</text>
+            <text class="cat-pct">{{item.percent}}%</text>
+          </text>
+        </view>
+        <view class="bar">
+          <text class="bar-fill" style="width: {{item.w}}%; background: {{item.color}}"></text>
+        </view>
+      </view>
+      <text class="cat-count">{{item.count}}笔</text>
+    </view>
+  </view>
+
+  <!-- 成员维度 -->
+  <view wx:if="{{byMember.length}}" class="card">
+    <view class="sec-title"><text>成员{{typeLabel}}分布</text></view>
+    <view wx:for="{{byMember}}" wx:key="user_id" class="mem-row">
+      <text class="mem-avatar">{{item.avatar || '👤'}}</text>
+      <view class="mem-main">
+        <view class="mem-line">
+          <text class="mem-name">{{item.name}}</text>
+          <text class="mem-amt">¥{{item.amount}}<text class="mem-pct">{{item.percent}}%</text></text>
+        </view>
+        <view class="bar">
+          <text
+            class="bar-fill {{isExpense ? 'fill-expense' : 'fill-income'}}"
+            style="width: {{item.percent > 1 ? item.percent : 1}}%"
+          ></text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 趋势 -->
+  <view class="card">
+    <view class="sec-title">
+      <text>收支趋势</text>
+      <text class="unit">单位：元</text>
+    </view>
+    <view class="trend-legend">
+      <text class="tl-item"><text class="tl-dot inc"></text>收入</text>
+      <text class="tl-item"><text class="tl-dot exp"></text>支出</text>
+    </view>
+    <view wx:if="{{trendEmpty}}" class="empty-sm">该区间暂无趋势数据</view>
+    <canvas type="2d" id="trendCanvas" class="trend"></canvas>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-tip">加载中…</view>
+
+  <!-- 分类逐笔明细弹窗 -->
+  <view wx:if="{{showCategory}}" class="cat-mask" bindtap="closeCat">
+    <view class="cat-card" catchtap>
+      <view class="cat-head">
+        <text class="cat-head-title">{{activeCat.icon}} {{activeCat.name}} 明细</text>
+        <text class="cat-head-close" bindtap="closeCat">×</text>
+      </view>
+      <view class="cat-body">
+        <view class="cat-summary">
+          <view class="cat-summary-icon" style="background: {{activeCat.bg}}">
+            {{activeCat.icon}}
+          </view>
+          <view class="cat-summary-info">
+            <view class="cat-summary-name">{{activeCat.name}} · {{filteredTxs.length}} 笔</view>
+            <view class="cat-summary-amount {{isExpense ? 'text-expense' : 'text-income'}}">
+              ¥{{filteredTotal}}
+            </view>
+          </view>
+        </view>
+
+        <view class="cat-filters">
+          <text
+            class="cat-filter {{catFilter === 'all' ? 'active' : ''}}"
+            data-id="all"
+            bindtap="onCatFilter"
+          >全部</text>
+          <text
+            wx:for="{{members}}"
+            wx:key="id"
+            class="cat-filter {{catFilter == item.user ? 'active' : ''}}"
+            data-id="{{item.user}}"
+            bindtap="onCatFilter"
+          >{{item.book_type === 'wife' ? '👤' : '🧑'}} {{item.nickname || item.username}}</text>
+        </view>
+
+        <view class="cat-list">
+          <view wx:for="{{filteredTxs}}" wx:key="id" class="cat-tx">
+            <text class="cat-tx-avatar">{{item.avatar}}</text>
+            <view class="cat-tx-info">
+              <view class="cat-tx-title">{{item.merchant || '未填写商户'}}</view>
+              <view class="cat-tx-sub">
+                {{item.memberText}} · {{item.dayText}}<text wx:if="{{item.description}}"> · {{item.description}}</text>
+              </view>
+            </view>
+            <text class="cat-tx-amount {{item.isIncome ? 'text-income' : 'text-expense'}}">
+              {{item.isIncome ? '+' : '-'}}¥{{item.amountText}}
+            </text>
+          </view>
+          <view wx:if="{{!filteredTxs.length}}" class="cat-empty">暂无记录</view>
+        </view>
+      </view>
+    </view>
+  </view>
 </view>

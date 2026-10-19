@@ -294,46 +294,19 @@ onBeforeUnmount(() => {
       >{{ p.label }}</span>
     </div>
 
-    <!-- 收入 / 支出 主切换 -->
-    <div class="type-switch">
-      <div
-        class="switch-item expense"
-        :class="{ active: isExpense }"
-        @click="type = 'expense'"
-      >
-        <span class="sw-label">💸 支出报告</span>
-        <span class="sw-amount">¥{{ fmt(summary.expense) }}</span>
-      </div>
-      <div
-        class="switch-item income"
-        :class="{ active: !isExpense }"
-        @click="type = 'income'"
-      >
-        <span class="sw-label">💰 收入报告</span>
-        <span class="sw-amount">¥{{ fmt(summary.income) }}</span>
-      </div>
-    </div>
-
-    <!-- 账户范围 -->
-    <div class="chip-row">
-      <span class="chip" :class="{ active: !accountId }" @click="accountId = ''">全部账户</span>
-      <span
-        v-for="a in filterableAccounts"
-        :key="a.account_id"
-        class="chip"
-        :class="{ active: accountId === a.account_id }"
-        @click="accountId = a.account_id"
-      >{{ a.icon }} {{ a.name }}</span>
-    </div>
-
-    <!-- 汇总 -->
+    <!--
+      首屏精简：原来「收支切换栏 + 账户 chips + 汇总卡」三块纵向堆叠，
+      手机上第一屏几乎只剩筛选。现在把收支切换并入汇总卡，账户 chips 下移，
+      一屏就能看到筛选、总额、三项指标和健康分。
+    -->
     <div class="card hero" :class="isExpense ? 'hero-expense' : 'hero-income'">
-      <div class="hero-top">
-        <span>{{ range.label }} · {{ scopeName }}</span>
+      <div class="hero-tabs">
+        <span class="hero-tab" :class="{ on: isExpense }" @click="type = 'expense'">支出</span>
+        <span class="hero-tab" :class="{ on: !isExpense }" @click="type = 'income'">收入</span>
       </div>
       <div class="hero-amount">¥{{ fmt(summary.total) }}</div>
       <div class="hero-sub">
-        {{ typeLabel }}合计 · {{ summary.count }} 笔
+        {{ range.label }} · {{ scopeName }} · {{ summary.count }} 笔
       </div>
       <div class="hero-stats">
         <div class="stat">
@@ -350,6 +323,18 @@ onBeforeUnmount(() => {
           <span>{{ isExpense ? '占收入' : '储蓄率' }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- 账户范围：放在汇总卡之后，首屏先看数字，想细看再滑一点选账户 -->
+    <div v-if="filterableAccounts.length" class="chip-row account-row">
+      <span class="chip" :class="{ active: !accountId }" @click="accountId = ''">全部账户</span>
+      <span
+        v-for="a in filterableAccounts"
+        :key="a.account_id"
+        class="chip"
+        :class="{ active: accountId === a.account_id }"
+        @click="accountId = a.account_id"
+      >{{ a.icon }} {{ a.name }}</span>
     </div>
 
     <!-- 智能分析：健康分 + 洞察 + 改进建议（后端规则引擎，与报告同口径） -->
@@ -584,49 +569,31 @@ onBeforeUnmount(() => {
   flex: none;
 }
 
-/* 收入 / 支出 主切换 */
-.type-switch {
+/* 汇总卡的收支切换：半透明白胶囊，选中态实白底 + 主色字。
+   并入卡内后省掉一条独立的切换栏，首屏能多露出一块内容。 */
+.hero-tabs {
   display: flex;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.switch-item {
-  flex: 1;
-  padding: 12px;
-  border-radius: var(--radius-card);
-  background: #fff;
-  border: 0.5px solid var(--border);
-  display: flex;
-  flex-direction: column;
   gap: 6px;
+  margin-bottom: 10px;
+}
+.hero-tab {
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.18);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-.switch-item .sw-label {
-  font-size: var(--font-sm);
-  color: var(--text-sub);
-}
-.switch-item .sw-amount {
-  font-size: 17px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+.hero-tab.on {
+  background: #fff;
   color: var(--text-main);
+  font-weight: 600;
 }
-.switch-item.active.expense {
-  background: #fdecec;
-  border-color: var(--expense);
-}
-.switch-item.active.expense .sw-label,
-.switch-item.active.expense .sw-amount {
-  color: var(--expense);
-}
-.switch-item.active.income {
-  background: #e8f5f0;
-  border-color: var(--income);
-}
-.switch-item.active.income .sw-label,
-.switch-item.active.income .sw-amount {
-  color: var(--income);
+
+/* 账户筛选条：只为对齐间距，不影响首屏高度 */
+.account-row {
+  margin-top: -4px;
 }
 
 /* 汇总卡 */
@@ -642,14 +609,11 @@ onBeforeUnmount(() => {
 .hero-income {
   background: linear-gradient(135deg, #1d9e75, #157a5b);
 }
-.hero-top {
-  font-size: var(--font-sm);
-  opacity: 0.9;
-}
 .hero-amount {
   font-size: 30px;
   font-weight: 700;
-  margin: 8px 0 2px;
+  margin: 2px 0;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 .hero-sub {

@@ -14,7 +14,13 @@ from apps.families.serializers import (
     MemberSerializer,
     ThresholdSerializer,
 )
-from apps.families.services import build_viewer_ctx, require_member
+from apps.families.services import (
+    BOOK_FALLBACK,
+    build_viewer_ctx,
+    get_invitation,
+    join_family_by_invitation,
+    require_member,
+)
 
 # 一个家庭默认最多 5 位成员（1 主账号 + 4 子账号）：伴侣之外还能拉父母、成年子女、室友
 # 主账号开了 VIP 就扩到 10 人——会员权益按家庭生效，全家人一起受益
@@ -26,8 +32,7 @@ def _family_limit(user) -> int:
     from apps.membership.services import member_limit
 
     return member_limit(user)
-# 新成员账本按空缺顺位分配；三个账本都用完后并入「共同账本」，靠归属人区分
-BOOK_FALLBACK = (FamilyMember.BOOK_WIFE, FamilyMember.BOOK_HUSBAND, FamilyMember.BOOK_SHARED)
+# 新成员账本按空缺顺位分配（BOOK_FALLBACK 定义在 services，注册流程共用）
 BOOK_CODES = {FamilyMember.BOOK_HUSBAND, FamilyMember.BOOK_WIFE, FamilyMember.BOOK_SHARED}
 
 
@@ -43,21 +48,8 @@ def _status_of(inv: Invitation) -> str:
 
 
 def _get_invite(token: str) -> Invitation:
-    """按 token 取邀请并校验可用性。"""
-    inv = (Invitation.objects.filter(token_hash=(token or '').strip())
-           .select_related('family', 'family__owner').first())
-    if not inv:
-        raise BusinessError('邀请码无效，请让主账号重新生成', code=4004)
-    if inv.status == Invitation.STATUS_ACCEPTED:
-        raise BusinessError('该邀请已被使用')
-    if inv.status == Invitation.STATUS_REVOKED:
-        raise BusinessError('该邀请已被撤销')
-    if inv.expires_at <= timezone.now():
-        if inv.status != Invitation.STATUS_EXPIRED:
-            inv.status = Invitation.STATUS_EXPIRED
-            inv.save(update_fields=['status'])
-        raise BusinessError('邀请已过期，请让主账号重新生成')
-    return inv
+    """按 token 取邀请并校验可用性（实现见 services.get_invitation，注册流程共用）。"""
+    return get_invitation(token)
 
 
 class FamilyMeView(APIView):
@@ -210,32 +202,17 @@ class InvitationAcceptView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        inv = _get_invite(str((request.data or {}).get('token') or ''))
-        user = request.user
-        if FamilyMember.objects.filter(user=user).exists():
-            raise BusinessError('你已经在一个家庭里了，如需换家庭请先让主账号移除你')
-        family = inv.family
-        limit = _family_limit(family.owner)
-        if family.members.count() >= limit:
-            raise BusinessError(f'该家庭已满 {limit} 位成员，请让主账号先移除一位')
-
-        used = set(family.members.values_list('book_type', flat=True))
-        book = next((b for b in BOOK_FALLBACK if b not in used), FamilyMember.BOOK_SHARED)
-        member = FamilyMember.objects.create(
-            family=family,
-            user=user,
-            role=FamilyMember.ROLE_MEMBER,
-            nickname=inv.nickname or _display_name(user),
-            book_type=book,
-            permissions={**DEFAULT_PERMISSIONS, **(inv.permissions or {})},
+        # 账本分配、权限继承、「已误建空家庭则解散后加入」都在 services 里，
+        # 注册接口带邀请码时复用同一套逻辑，避免两处规则跑偏
+        result = join_family_by_invitation(
+            request.user,
+            str((request.data or {}).get('token') or ''),
         )
-        inv.status = Invitation.STATUS_ACCEPTED
-        inv.save(update_fields=['status'])
         return api_response({
-            'family_name': family.name,
-            'book_type': book,
-            'member': MemberSerializer(member).data,
-        }, message='已加入「%s」' % family.name)
+            'family_name': result['family_name'],
+            'book_type': result['book_type'],
+            'member': MemberSerializer(result['member']).data,
+        }, message='已加入「%s」' % result['family_name'])
 
 
 class MemberDetailView(APIView):

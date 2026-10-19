@@ -32,11 +32,16 @@ Page({
 
     // 账户与账本
     accounts: [],
+    // 只含我名下账户（后端 is_mine），记账只能落到自己的账户
+    myAccounts: [],
     bookType: '',
     bookLabels: {},
     myBook: 'husband',
+    // 账本 chips：我的账本 + 共同账本（编辑老账单时会补上原账本）
     existingBooks: [],
     visibleAccounts: [],
+    // 账户 chips：可见账户，编辑老账单时兜底保留原账户
+    accountChoices: [],
     accountId: '',
 
     // 金额 · 备注 · 隐私
@@ -47,6 +52,9 @@ Page({
 
     // 日期（默认今天，可改到过去）
     txDate: ymd(new Date()),
+    // 日期框里显示的 YYYY/MM/DD（对齐 H5 dateDisplay）
+    dateDisplay: ymd(new Date()).split('-').join('/'),
+    // 相对描述（今天/昨天/M月D日），供其它文案复用
     shortDate: '今天',
     showDatePanel: false,
     viewYM: ymd(new Date()).slice(0, 7),
@@ -133,36 +141,75 @@ Page({
     return this.data.bookLabels[type] || DEFAULT_BOOK[type] || type
   },
 
+  /**
+   * 可记账的账户：只保留「我名下」的账户。
+   * 后端回 is_mine 布尔值（不暴露 user_id），记账只能落到自己的账户上。
+   */
+  _myAccounts(accounts) {
+    return (accounts || []).filter((a) => a.is_mine !== false)
+  },
+
+  /**
+   * 可选的账本：只出现「我的账本 + 共同账本」。
+   * 对方专属账本整本不进选择，避免在自己账号体系下误选到对方的账本。
+   */
+  _bookChoices(myAccounts, currentBook) {
+    const used = new Set(myAccounts.map((a) => a.book_type))
+    const myBook = this.data.myBook
+    const list = BOOK_ORDER.filter((b) => {
+      if (b !== 'shared' && b !== myBook) return false
+      return used.has(b)
+    })
+    // 编辑老账单时若它落在已不可选的账本，补进来，否则 chips 里没有选中项
+    if (currentBook && list.indexOf(currentBook) === -1) list.push(currentBook)
+    return list
+  },
+
+  /** 账户 chips：编辑态下原账户可能不在我名下，兜底保留，避免保存时被清空 */
+  _accountChoices(accounts, visibleAccounts, accountId) {
+    const list = visibleAccounts.slice()
+    if (accountId && !list.some((a) => a.id === accountId)) {
+      const origin = (accounts || []).find((a) => a.id === accountId)
+      if (origin) list.push(origin)
+    }
+    return list
+  },
+
   async loadAccounts() {
     await this.ensureMe()
     try {
       const d = await api.accounts()
       const accounts = d.items || d || []
-      // 只保留真实存在过账户的账本：系统固定三本账，没建账户的不该出现在选择里
-      const used = new Set(accounts.map((a) => a.book_type))
-      const existingBooks = BOOK_ORDER.filter((b) => used.has(b)).map((b) => ({
-        type: b,
-        name: this.bookName(b),
-        mine: b === this.data.myBook,
-      }))
+      const myAccounts = this._myAccounts(accounts)
       // 账本默认跟随登录身份：优先我自己的账本，自己名下没账户再退到共同账本
       let bookType = this.data.bookType
-      if (!bookType) {
-        const preferred = [this.data.myBook, 'shared', ...BOOK_ORDER]
-        bookType =
-          preferred.find((b) => accounts.some((a) => a.book_type === b)) ||
-          (accounts[0] && accounts[0].book_type) ||
-          ''
+      const choices = this._bookChoices(myAccounts, bookType)
+      if (!bookType || choices.indexOf(bookType) === -1) {
+        const preferred = [this.data.myBook, 'shared']
+        bookType = preferred.find((b) => myAccounts.some((a) => a.book_type === b)) || choices[0] || ''
       }
-      if (!accounts.some((a) => a.book_type === bookType)) bookType = (accounts[0] && accounts[0].book_type) || ''
-      const visibleAccounts = bookType ? accounts.filter((a) => a.book_type === bookType) : accounts
+      const visibleAccounts = bookType
+        ? myAccounts.filter((a) => a.book_type === bookType)
+        : myAccounts
       // 默认选中该账本第一个账户，避免漏选导致流水没有归属账户
-      const pool = visibleAccounts.length ? visibleAccounts : accounts
+      const pool = visibleAccounts.length ? visibleAccounts : myAccounts
       const accountId =
         this.data.accountId && pool.some((a) => a.id === this.data.accountId)
           ? this.data.accountId
           : (pool[0] && pool[0].id) || ''
-      this.setData({ accounts, existingBooks, bookType, visibleAccounts, accountId })
+      this.setData({
+        accounts,
+        myAccounts,
+        existingBooks: this._bookChoices(myAccounts, bookType).map((b) => ({
+          type: b,
+          name: this.bookName(b),
+          mine: b === this.data.myBook,
+        })),
+        bookType,
+        visibleAccounts,
+        accountChoices: this._accountChoices(accounts, visibleAccounts, accountId),
+        accountId,
+      })
     } catch (e) {
       /* 账户拉不到不影响先填其它字段，保存时会提示 */
     }
@@ -170,10 +217,11 @@ Page({
 
   onBook(e) {
     const type = e.currentTarget.dataset.type
-    const visibleAccounts = this.data.accounts.filter((a) => a.book_type === type)
+    const visibleAccounts = this.data.myAccounts.filter((a) => a.book_type === type)
     this.setData({
       bookType: type,
       visibleAccounts,
+      accountChoices: visibleAccounts,
       accountId: (visibleAccounts[0] && visibleAccounts[0].id) || '',
     })
   },
@@ -283,15 +331,27 @@ Page({
     const [y, m] = vm.split('-')
     return `${y}年${Number(m)}月`
   },
+  /**
+   * 日期标签与 H5 Add.vue 的 shortDate 完全一致：
+   *   今天 → 「今天」；昨天 → 「昨天」；更早 → 「M月D日」
+   */
   _refreshDateLabels() {
-    const today = ymd(new Date())
+    const now = new Date()
+    const today = ymd(now)
+    // 用日期差而不是字符串比较，跨月（如 11-01 的昨天是 10-31）也能认对
+    const yesterday = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
     const d = this.data.txDate
-    let shortDate = '今天'
-    if (d !== today) {
+    let shortDate = d
+    if (d === today) {
+      shortDate = '今天'
+    } else if (d === yesterday) {
+      shortDate = '昨天'
+    } else {
       const p = d.split('-')
       shortDate = `${Number(p[1])}月${Number(p[2])}日`
     }
-    this.setData({ shortDate })
+    // 日期框里显示完整日期（YYYY/MM/DD），与 H5 的 dateDisplay 一致
+    this.setData({ shortDate, dateDisplay: d.split('-').join('/') })
   },
   _buildCalendar(vm) {
     const [y, m] = vm.split('-').map(Number)
@@ -395,8 +455,22 @@ Page({
       await this.loadAccounts()
       const acc = this.data.accounts.find((a) => a.id === t.account_id)
       if (acc) {
-        const visibleAccounts = this.data.accounts.filter((a) => a.book_type === acc.book_type)
-        this.setData({ bookType: acc.book_type, visibleAccounts, accountId: acc.id })
+        // 老账单可能落在对方账本 / 对方账户：账本与账户都要补进 chips，
+        // 否则界面上看不到选中项，一保存就把归属改掉了
+        const visibleAccounts = this.data.myAccounts.filter(
+          (a) => a.book_type === acc.book_type
+        )
+        this.setData({
+          bookType: acc.book_type,
+          visibleAccounts,
+          existingBooks: this._bookChoices(this.data.myAccounts, acc.book_type).map((b) => ({
+            type: b,
+            name: this.bookName(b),
+            mine: b === this.data.myBook,
+          })),
+          accountChoices: this._accountChoices(this.data.accounts, visibleAccounts, acc.id),
+          accountId: acc.id,
+        })
       }
     } catch (e) {
       wx.showToast({ title: e.message || '加载账单失败', icon: 'none' })

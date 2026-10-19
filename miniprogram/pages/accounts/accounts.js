@@ -45,6 +45,8 @@ function emptyForm() {
     isInvest: false,
     // 与 H5 一致：表单里填的是「收益总额」，本金由 现值 − 收益 倒推后单独提交。
     // 存的是本金、显示的是收益，别把方向写反（反了每编辑一次收益就变号）。
+    // 手机数字键盘打不出负号，所以拆成「盈亏开关 + 只填数字」：开关定正负
+    profitLoss: false,
     profit: '',
     balance: '',
   }
@@ -165,6 +167,11 @@ Page({
   openEdit() {
     const a = this.data.current
     if (!a) return
+    // 回填收益：收益 = 现值 − 本金（本金没录过就留空，保存时收益从 0 起算）
+    const pf =
+      a.is_invest && Number(a.principal_cents) > 0
+        ? yuan((Number(a.balance_cents) || 0) - Number(a.principal_cents))
+        : 0
     this.setData({
       showActions: false,
       showEdit: true,
@@ -179,11 +186,9 @@ Page({
         accountNo: a.account_no || '',
         isCountTotal: a.is_count_total !== false,
         isInvest: !!a.is_invest,
-        // 回填收益：收益 = 现值 − 本金（本金没录过就留空，保存时收益从 0 起算）
-        profit:
-          a.is_invest && Number(a.principal_cents) > 0
-            ? String(yuan((Number(a.balance_cents) || 0) - Number(a.principal_cents)))
-            : '',
+        // 亏了就把开关切到「亏损」，输入框只留绝对值，用户一眼能看出是亏
+        profitLoss: pf < 0,
+        profit: Math.abs(pf) > 0.001 ? String(Math.abs(pf)) : '',
         balance: '',
       },
     })
@@ -192,7 +197,16 @@ Page({
     this.setData({ showEdit: false, editing: null })
   },
   onInput(e) {
-    this.setData({ [`form.${e.currentTarget.dataset.field}`]: e.detail.value })
+    const field = e.currentTarget.dataset.field
+    let v = e.detail.value
+    // 收益框只收数字：负号交给「盈亏」开关，避免出现 - 号被键盘吃掉
+    if (field === 'profit') {
+      v = String(v || '').replace(/[^\d.]/g, '')
+    }
+    this.setData({ [`form.${field}`]: v })
+  },
+  onProfitSign(e) {
+    this.setData({ 'form.profitLoss': e.currentTarget.dataset.loss === '1' })
   },
   onIcon(e) {
     this.setData({ 'form.icon': e.currentTarget.dataset.icon })
@@ -225,7 +239,8 @@ Page({
     // 收益校验放前面，避免先转圈再弹错误
     let principalVal = null
     if (f.isInvest) {
-      const pf = f.profit === '' ? 0 : Number(f.profit)
+      // profit 存的是绝对值，正负由「盈亏」开关决定
+      const pf = f.profit === '' ? 0 : (f.profitLoss ? -1 : 1) * Math.abs(Number(f.profit))
       if (!Number.isFinite(pf)) return wx.showToast({ title: '收益金额不正确', icon: 'none' })
       // 现值：编辑时用账户当前余额，新建时用填的初始余额
       const balYuan = this.data.editing

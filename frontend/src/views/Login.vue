@@ -41,6 +41,14 @@ const wxBusy = ref(false)
 const isRegister = computed(() => mode.value === 'register')
 const isForgot = computed(() => mode.value === 'forgot')
 
+/**
+ * 邀请注册：从分享链接进来会带 ?invite=xxx。
+ * 带上它注册，后端就不建「自己的家庭」，而是直接加入邀请方家庭成为子账号；
+ * 不带的走原逻辑（建家庭 + 主账号）。少了这一步，被邀请人注册后会变成
+ * 自己家庭的主账号，之后接受邀请被「已在家庭中」挡住。
+ */
+const inviteToken = computed(() => String(route.query.invite || ''))
+
 function switchMode(next) {
   if (mode.value === next) return
   mode.value = next
@@ -178,6 +186,12 @@ async function onReset() {
 
 /** 跳到登录后该去的页面：注册完成一律回首页，登录优先回 redirect 目标 */
 function goHome() {
+  // 邀请注册已在后端完成加入，直接进家庭页看结果；
+  // 登录态下仍需回 join 让用户确认，所以只有注册这条路跳过 join
+  if (isRegister.value && inviteToken.value) {
+    router.replace('/family')
+    return
+  }
   router.replace(isRegister.value ? '/' : route.query.redirect || '/')
 }
 
@@ -218,6 +232,8 @@ async function onRegister() {
       phone: phone.value,
       password: password.value,
       nickname: nickname.value.trim(),
+      // 带邀请码注册 → 后端直接加入邀请方家庭，不建自己的家庭
+      invite_token: inviteToken.value,
     })
     goHome()
   } catch (e) {
@@ -337,7 +353,11 @@ function onSubmit() {
         </div>
       </template>
       </template>
-      <p v-if="isRegister" class="note">
+      <!-- 邀请注册与普通注册的结果完全不同，提示要分开写，否则用户以为自己是主账号 -->
+      <p v-if="isRegister && inviteToken" class="note note-invite">
+        🔑 你正在接受家庭邀请：注册后会直接加入对方的家庭，成为子账号，不会创建你自己的家庭。
+      </p>
+      <p v-else-if="isRegister" class="note">
         注册后会自动建一个家庭，你就是主账号；之后可在「我的 → 主账号设置」里把它转让给对方。
       </p>
     </div>
@@ -443,6 +463,13 @@ function onSubmit() {
   line-height: 1.6;
   margin-top: 10px;
   text-align: center;
+}
+/* 邀请注册提示：用主色底突出，和普通说明区分开 */
+.note-invite {
+  color: #534ab7;
+  background: #eeedfe;
+  padding: 8px 10px;
+  border-radius: 8px;
 }
 /* 登录 / 注册切换 */
 .tabs {

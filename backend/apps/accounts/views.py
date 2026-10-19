@@ -102,12 +102,19 @@ class AccountViewSet(viewsets.ModelViewSet):
             return AccountCreateSerializer
         return AccountSerializer
 
+    def get_serializer_context(self):
+        # is_mine 依赖请求用户，漏传 context 会一律判成 False
+        ctx = super().get_serializer_context()
+        ctx.setdefault('request', self.request)
+        return ctx
+
     def create(self, request, *args, **kwargs):
         member = require_member(request.user)
         ser = AccountCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         account = ser.save(family=member.family, user=request.user)
-        return api_response(AccountSerializer(account).data, message='账户已创建',
+        return api_response(AccountSerializer(account, context={'request': request}).data,
+                            message='账户已创建',
                             http_status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -117,7 +124,8 @@ class AccountViewSet(viewsets.ModelViewSet):
         ser = AccountCreateSerializer(account, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
-        return api_response(AccountSerializer(account).data, message='账户已更新')
+        return api_response(AccountSerializer(account, context={'request': request}).data,
+                            message='账户已更新')
 
     def destroy(self, request, *args, **kwargs):
         account = self.get_object()
@@ -159,7 +167,8 @@ class AccountViewSet(viewsets.ModelViewSet):
                 defaults={'balance_cents': new_cents,
                           'principal_cents': locked.principal_cents},
             )
-        return api_response(AccountSerializer(account).data, message='余额已调整')
+        return api_response(AccountSerializer(account, context={'request': request}).data,
+                            message='余额已调整')
 
     @action(detail=True, methods=['post'], url_path='principal')
     def set_principal(self, request, pk=None):
@@ -204,7 +213,7 @@ class AccountViewSet(viewsets.ModelViewSet):
                 defaults={'balance_cents': locked.balance_cents,
                           'principal_cents': after},
             )
-        return api_response(AccountSerializer(account).data,
+        return api_response(AccountSerializer(account, context={'request': request}).data,
                             message='本金已追加' if mode == 'add' else '本金已更新')
 
     @action(detail=False, methods=['get'], url_path='netvalue')

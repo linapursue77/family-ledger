@@ -1,94 +1,277 @@
-.user-card {
+/*
+ * 「我的」页样式：视觉参考 H5 Mine.vue 的渐变头像区 + 白卡分组，
+ * 但按小程序的安全区与字号重新调过，不照搬 px 数值。
+ */
+
+/* ---------- 用户卡：渐变底，与首页资产卡同一套主色 ---------- */
+.profile-card {
   display: flex;
   align-items: center;
   gap: 24rpx;
+  margin: 0 24rpx 20rpx;
   padding: 36rpx 32rpx;
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, #7f77dd, #534ab7);
+  color: #fff;
+  box-shadow: 0 8rpx 28rpx rgba(83, 74, 183, 0.24);
 }
 .avatar {
+  flex: none;
   width: 96rpx;
   height: 96rpx;
   border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
+  /* 半透明白底，压在渐变上比实色更融合 */
+  background: rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 40rpx;
   font-weight: 700;
 }
-.user-info {
+.profile-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 8rpx;
 }
-.user-name {
-  font-size: 34rpx;
+.profile-name {
+  font-size: 36rpx;
   font-weight: 700;
-  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.user-family {
-  font-size: 26rpx;
-  margin-top: 6rpx;
+.profile-bind {
+  font-size: 24rpx;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.section {
-  padding: 28rpx;
-}
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12rpx;
-}
-.section-title {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: var(--text-main);
-}
-.arrow {
-  font-size: 34rpx;
-  color: #c8c6c0;
-}
-.add-btn {
-  color: var(--primary);
-  font-size: 28rpx;
-}
-.acc-icon {
+.profile-card .arrow {
+  flex: none;
   font-size: 40rpx;
+  color: rgba(255, 255, 255, 0.7);
 }
-.acc-info {
+
+/* ---------- 资产总览：三列白卡 ---------- */
+.overview {
+  display: flex;
+  margin: 0 24rpx 20rpx;
+  padding: 28rpx 0;
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.ov-item {
   flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  min-width: 0;
 }
-.acc-name {
+/* 中间两列加细分隔线，读起来是三块而不是一片 */
+.ov-item + .ov-item {
+  border-left: 1rpx solid var(--divider);
+}
+.ov-value {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+}
+.ov-label {
+  font-size: 22rpx;
+  color: var(--text-muted);
+}
+
+/* ---------- 分组卡：标题在卡内，行与行之间细分隔线 ---------- */
+.menu-section {
+  margin: 0 24rpx 20rpx;
+  padding: 8rpx 28rpx;
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.menu-title {
+  font-size: 22rpx;
+  color: var(--text-muted);
+  padding: 20rpx 0 4rpx;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 26rpx 0;
+  border-bottom: 1rpx solid var(--divider);
+}
+.menu-item:last-child {
+  border-bottom: none;
+}
+.menu-icon {
+  flex: none;
+  font-size: 34rpx;
+  line-height: 1;
+}
+/* 主文案 + 次要说明的纵向容器：说明文字长，必须允许换行 */
+.menu-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.menu-text {
+  flex: 1;
+  min-width: 0;
   font-size: 30rpx;
+  color: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 放在 .menu-main 里时不再 flex:1，由容器决定宽度，允许折行 */
+.menu-main .menu-text {
+  flex: none;
+}
+.menu-desc {
+  font-size: 22rpx;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: normal;
+}
+/* 原生 switch 默认偏大，缩到与行高协调的尺寸 */
+.ai-switch {
+  flex: none;
+  transform: scale(0.8);
+  transform-origin: right center;
+  margin-right: -8rpx;
+}
+
+/* ---------- AI 配置表单 ---------- */
+.picker-value {
+  font-size: 28rpx;
+  color: var(--text-main);
+  text-align: right;
+}
+/* 两个按钮等宽并排：测试 + 保存，比上下堆叠省一屏 */
+.ai-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.ai-btn {
+  flex: 1;
+  font-size: 26rpx;
+  padding: 18rpx 0;
+  line-height: 1.4;
+  margin: 0;
+}
+.menu-value {
+  flex: none;
+  max-width: 46%;
+  font-size: 24rpx;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-arrow {
+  flex: none;
+  font-size: 32rpx;
+  color: #c8c6c0;
+}
+
+/* ---------- 行内展开的表单（隐私额度 / 密码） ---------- */
+.sub-form {
+  padding: 4rpx 0 24rpx;
+  border-top: 1rpx solid var(--divider);
+}
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid var(--divider);
+}
+.field-label {
+  flex: none;
+  font-size: 28rpx;
+  color: var(--text-sub);
+}
+.field-row input {
+  flex: 1;
+  min-width: 0;
+  /* 不设 width:100%，与记账页一致：只靠 flex 撑开，避免 padding 撑破容器 */
+  box-sizing: border-box;
+  font-size: 28rpx;
+  text-align: right;
+  color: var(--text-main);
+}
+.quota-chips {
+  display: flex;
+  gap: 12rpx;
+  padding: 16rpx 0 4rpx;
+}
+.quota-chips .qchip {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 0;
+  border-radius: 12rpx;
+  background: #faf9f6;
+  border: 1rpx solid var(--border);
+  font-size: 24rpx;
+  color: var(--text-sub);
+}
+.quota-chips .qchip.on {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
   font-weight: 600;
 }
-.acc-book {
+.form-msg {
+  margin-top: 16rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  background: var(--primary-light);
+  color: var(--primary-dark);
   font-size: 24rpx;
+  line-height: 1.5;
 }
-.acc-balance {
-  font-weight: 700;
-  font-size: 30rpx;
-}
-.item-value {
-  font-size: 26rpx;
+.form-note {
+  margin-top: 16rpx;
+  font-size: 22rpx;
   color: var(--text-muted);
-  margin-left: auto;
-  padding-right: 16rpx;
+  line-height: 1.6;
 }
-/* 分享入口必须是真 button（open-type="share"），这里把 button 默认样式清掉，
-   让它跟其它 view 列表项长得一模一样 */
+.sub-form .btn-primary {
+  margin-top: 20rpx;
+}
+
+/* ---------- 分享入口必须是真 button，这里清掉默认样式 ---------- */
 .share-item {
   width: 100%;
   margin: 0;
-  padding: 24rpx 0;
+  padding: 26rpx 0;
   background: transparent;
   border: none;
+  border-bottom: 1rpx solid var(--divider);
   border-radius: 0;
   line-height: normal;
   text-align: left;
   font-size: 30rpx;
-  color: var(--text-main);
+  color: var(--text-body);
 }
 .share-item::after {
   border: none;
@@ -96,52 +279,8 @@
 .share-hover {
   background: #f6f5f1;
 }
-.pwd-form {
-  padding: 8rpx 0 4rpx;
-}
-.pwd-note {
-  font-size: 22rpx;
-  color: var(--text-sub);
-  line-height: 1.6;
-  padding: 8rpx 0 0;
-}
-.logout-area {
-  padding: 40rpx 24rpx;
-}
-.btn-logout {
-  background: #fff;
-  color: var(--expense);
-  border: 1rpx solid var(--border);
-  border-radius: var(--radius-btn);
-  font-size: 30rpx;
-  padding: 22rpx 0;
-  text-align: center;
-}
-.field-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid var(--divider);
-}
-.field-label {
-  font-size: 28rpx;
-  color: var(--text-sub);
-}
-.field-value {
-  font-size: 28rpx;
-}
-.field-row input {
-  font-size: 28rpx;
-  text-align: right;
-  flex: 1;
-  margin-left: 24rpx;
-}
-/* 未登录态 */
-.user-card .arrow {
-  font-size: 40rpx;
-  color: #c8c6c0;
-}
+
+/* ---------- 未登录态 ---------- */
 .guest-tip {
   text-align: center;
   font-size: 24rpx;

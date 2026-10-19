@@ -192,3 +192,51 @@
   line-height: 1.6;
   padding: 16rpx 4rpx 0;
 }
+
+/* 收益总额：盈亏开关 + 数字输入 */
+.profit-row {
+  align-items: flex-start;
+}
+.profit-main {
+  flex: 1;
+}
+.sign-row {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+.sign-btn {
+  flex: 1;
+  padding: 14rpx 0;
+  text-align: center;
+  font-size: 24rpx;
+  border-radius: 12rpx;
+  background: #f1efe8;
+  color: var(--text-sub);
+}
+.sign-plus.on {
+  background: #e1f5ee;
+  color: #0f6e56;
+  font-weight: 600;
+}
+.sign-minus.on {
+  background: #fcecec;
+  color: #a32d2d;
+  font-weight: 600;
+}
+.profit-input {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+}
+.profit-sign {
+  font-size: 26rpx;
+  color: var(--text-muted);
+}
+.profit-input input {
+  flex: 1;
+  font-size: 28rpx;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

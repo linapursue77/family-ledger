@@ -74,17 +74,19 @@ async function loadAi() {
 }
 async function toggleAI() {
   if (!aiConfigured.value) {
-    // 没配置时点开关不是“没反应”，而是直接带用户去填配置
+    // 没配置时打开开关 = 要求配置：直接展开表单，让用户就地填完
     showAiForm.value = true
     aiMsg.value = aiCfg.value?.has_key
       ? '还差接口地址或模型名：在下方补全后保存'
       : '还没配置大模型：填好 API Key 并保存后，这里就能切换到 AI 分析'
     return
   }
-  // 顶部开关 = 启用/停用：只提交 enabled，失败则回滚，避免界面与库里不一致
+  // 已配置：开关只控制启用/停用，失败了回滚，避免界面与库里不一致
   aiMsg.value = ''
   const next = !useAI.value
   useAI.value = next
+  // 关掉开关就把配置区收起，省得留一块空表单占着屏幕
+  showAiForm.value = false
   localStorage.setItem('insight_use_ai', next ? '1' : '0')
   try {
     aiCfg.value = await ledgerApi.saveAiConfig({ enabled: next })
@@ -125,7 +127,8 @@ async function saveAi() {
     useAI.value = !!aiCfg.value.enabled
     localStorage.setItem('insight_use_ai', useAI.value ? '1' : '0')
     aiForm.api_key = ''
-    showAiForm.value = false // 保存即收起，点「配置大模型」可再展开
+    // 保存即收起：开关重新成为唯一入口，要看配置再点一次开关即可
+    showAiForm.value = false
     if (!aiConfigured.value) {
       aiMsg.value = '已保存，但 Key / 接口地址 / 模型名不全，暂仍使用本地分析'
     } else {
@@ -457,7 +460,19 @@ onMounted(() => {
       <div class="menu-title">智能分析</div>
       <div class="menu-item" @click="toggleAI">
         <span class="menu-icon">🤖</span>
-        <span class="menu-text">AI 智能分析</span>
+        <span class="menu-main">
+          <span class="menu-text">AI 智能分析</span>
+          <!-- 未配置时说明「现在走本地」，配好就不再解释，避免和开关状态重复 -->
+          <span v-if="!aiConfigured" class="menu-desc">
+            未配置大模型，报告页自动改用本地规则分析；点右侧开关即可填写
+          </span>
+          <!-- 已启用且表单收起时，给一个改配置的入口；关掉开关就一并消失 -->
+          <span
+            v-else-if="useAI && !showAiForm"
+            class="menu-desc menu-link"
+            @click.stop="showAiForm = true"
+          >修改配置</span>
+        </span>
         <span class="menu-value">{{ aiStateText }}</span>
         <span
           class="switch"
@@ -467,14 +482,10 @@ onMounted(() => {
           <span class="switch-dot"></span>
         </span>
       </div>
-      <!-- 配置入口默认收起：只有开关被打开（或已配好 Key）后才出现 -->
-      <div v-if="showAiForm || aiConfigured" class="menu-item" @click="showAiForm = !showAiForm">
-        <span class="menu-icon">⚙️</span>
-        <span class="menu-text">配置大模型</span>
-        <span class="menu-value">{{ aiCfg?.has_key ? '已存 Key' : '未填写' }}</span>
-        <span class="menu-arrow">{{ showAiForm ? '⌃' : '›' }}</span>
-      </div>
-
+      <!--
+        开关即配置入口：打开开关直接展开配置表单，关闭则收起。
+        不再额外放「大模型设置」行——同一件事占两个位置会让层级变乱。
+      -->
       <div v-if="aiMsg" class="ai-msg">{{ aiMsg }}</div>
 
       <div v-if="showAiForm" class="ai-form">
@@ -585,16 +596,12 @@ onMounted(() => {
     <!-- 家庭管理 -->
     <div class="menu-section">
       <div class="menu-title">家庭管理</div>
-      <div class="menu-item" @click="router.push({ path: '/family', query: { invite: '1' } })">
-        <span class="menu-icon">👥</span>
-        <span class="menu-text">邀请成员</span>
-        <span class="menu-value">{{ inviteText === '已满' ? '已满' : '' }}</span>
-        <span class="menu-arrow">{{ inviteText }}</span>
-      </div>
+      <!-- 「邀请成员」与「家庭成员」都在 family 页，合并为一行：
+           邀请是成员管理里的一个操作，不必单独占入口 -->
       <div class="menu-item" @click="router.push('/family')">
         <span class="menu-icon">👥</span>
-        <span class="menu-text">家庭成员</span>
-        <span class="menu-value">{{ memberCountText }}</span>
+        <span class="menu-text">家庭成员与邀请</span>
+        <span class="menu-value">{{ inviteText === '已满' ? '已满' : memberCountText }}</span>
         <span class="menu-arrow">›</span>
       </div>
       <!-- 主账号设置：注册的人默认就是主账号，可在这里把管理权转让给对方 -->
@@ -879,6 +886,29 @@ onMounted(() => {
   line-height: 1.6;
   padding: 0 0 12px;
 }
+/* 主文案 + 次要说明的纵向容器：说明文字长，必须允许折行 */
+.menu-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.menu-main .menu-text {
+  flex: none;
+}
+.menu-desc {
+  font-size: 11px;
+  color: #888780;
+  line-height: 1.5;
+  white-space: normal;
+}
+/* 作为「可点」的次要链接用：主色 + 下划线点位，和纯说明文字区分 */
+.menu-link {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 /* 小开关：未配置大模型时置灰不可点 */
 .switch {
   flex: none;
@@ -900,8 +930,10 @@ onMounted(() => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   transition: transform 0.18s;
 }
+/* 打开态用绿色：绿色在此页没有其它语义占用，一眼能区分「已启用」与「已关闭」；
+   复用全局 --income 色值，避免另起一个绿 */
 .switch.on {
-  background: #534ab7;
+  background: var(--income);
 }
 .switch.on .switch-dot {
   transform: translateX(17px);

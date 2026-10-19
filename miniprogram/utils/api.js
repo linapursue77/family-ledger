@@ -8,6 +8,8 @@ module.exports = {
   me: () => request('GET', '/auth/me/'),
   // 设置 / 修改登录密码：无密码（纯微信登录）时不用传 old_password
   updatePassword: (data) => request('POST', '/auth/password/', data),
+  // 改个人资料：「我的」页的隐私额度走这里，只传 privacy_limit_cents
+  updateProfile: (data) => request('PATCH', '/auth/profile/', data),
 
   // 账户
   accounts: () => request('GET', '/accounts/'),
@@ -21,6 +23,11 @@ module.exports = {
   returns: (params) => request('GET', '/accounts/returns/', params),
   // 家庭总资产明细与净值曲线：首页资产卡下钻
   netValue: () => request('GET', '/accounts/netvalue/'),
+
+  // AI 大模型配置：「我的 → 智能分析」开关展开的配置表单用
+  aiConfig: () => request('GET', '/ledger/ai/config/'),
+  saveAiConfig: (data) => request('PUT', '/ledger/ai/config/', data),
+  testAi: (data) => request('POST', '/ledger/ai/config/test/', data),
 
   // 借贷
   loans: (params) => request('GET', '/loans/', params),
@@ -54,6 +61,9 @@ module.exports = {
   // 记账页的「＋」新增自定义分类：kind 为 expense / income
   createCategory: (data) => request('POST', '/ledger/categories/', data),
   overview: (params) => request('GET', '/ledger/overview/', params),
+  // 报告接口：与 H5 Report.vue 同源同口径
+  report: (params) => request('GET', '/ledger/report/', params),
+  reportInsight: (params) => request('GET', '/ledger/report/insight/', params),
   transactions: (params) => request('GET', '/ledger/transactions/', params),
   createTx: (data) => request('POST', '/ledger/transactions/', data),
   // 流水详情 / 改一笔 / 删一笔。

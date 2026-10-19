@@ -1,285 +1,434 @@
-/* 时间控件 */
-.time-picker-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* ============================================================
+   首页样式：与 H5 Home.vue 的 <style scoped> 逐条对齐（px→rpx，1px≈2rpx）
+   ★ 注意：home.wxml 已整体对齐 H5，本文件必须与 wxml 成对维护，
+     旧版首页（time-picker / pie / category 等）的样式已随 wxml 一并移除。
+   ============================================================ */
+
+/* 记账后回首页的轻提示 */
+.page-notice {
+  margin: 24rpx 32rpx 0;
   padding: 18rpx 24rpx;
-  background: #f7f6f3;
-  border-radius: 16rpx;
-  margin: 16rpx 24rpx 8rpx;
-}
-.time-picker-left {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-.time-picker-icon {
-  font-size: 28rpx;
-}
-.time-picker-text {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #26215c;
-}
-.time-picker-arrow {
-  font-size: 32rpx;
-  color: #c8c6c0;
-}
-.time-picker-options {
-  display: none;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin: 0 24rpx 16rpx;
-  padding: 20rpx;
-  background: #fff;
-  border-radius: 16rpx;
-  border: 1rpx solid #e8e8e8;
-}
-.time-picker-options.show {
-  display: flex;
-}
-.time-picker-option {
-  padding: 12rpx 24rpx;
-  border-radius: 12rpx;
+  border-radius: 20rpx;
+  background: var(--primary-light);
+  color: var(--primary-dark);
   font-size: 24rpx;
-  background: #f1efe8;
-  color: #5f5e5a;
 }
-.time-picker-option.active {
-  background: #eeedfe;
-  color: #7f77dd;
-  font-weight: 500;
+
+/* ---------- 时间范围胶囊：与报告页 .chip 同一套风格 ---------- */
+.period-row {
+  display: flex;
+  gap: 12rpx;
+  margin: 24rpx 32rpx 0;
 }
-.time-picker-option.custom {
-  background: linear-gradient(135deg, #7f77dd 0%, #9b8fe8 100%);
+.period-chip {
+  flex: 1;
+  text-align: center;
+  padding: 12rpx 0;
+  font-size: 24rpx;
+  background: #fff;
+  color: var(--text-sub);
+  border: 1rpx solid var(--border);
+  border-radius: 999rpx;
+}
+.period-chip.active {
+  background: linear-gradient(135deg, #7f77dd, #534ab7);
+  border-color: transparent;
   color: #fff;
   font-weight: 500;
 }
-.time-range-display {
-  padding: 12rpx 20rpx;
-  background: #f7f6f3;
-  border-radius: 12rpx;
-  margin: 0 24rpx 16rpx;
+.period-range {
+  margin: 16rpx 32rpx 24rpx;
   text-align: center;
-}
-.time-range-text {
-  font-size: 22rpx;
-  color: #888780;
+  font-size: 24rpx;
+  color: var(--text-muted);
 }
 
-/* 资产卡 */
+/* ---------- 自定义区间面板 ---------- */
+.custom-panel {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin: 16rpx 32rpx 0;
+  padding: 20rpx 24rpx;
+  background: #fff;
+  border: 1rpx solid var(--border);
+  border-radius: 20rpx;
+}
+.custom-date {
+  flex: 1;
+  min-width: 0;
+  padding: 12rpx 16rpx;
+  font-size: 26rpx;
+  color: var(--text-main);
+  background: #f7f6f3;
+  border: none;
+  border-radius: 16rpx;
+  text-align: center;
+}
+.custom-date.placeholder {
+  color: var(--text-muted);
+}
+.custom-sep {
+  flex: none;
+  font-size: 24rpx;
+  color: var(--text-muted);
+}
+.custom-ok {
+  flex: none;
+  width: auto;
+  padding: 14rpx 36rpx;
+  font-size: 26rpx;
+  border-radius: 16rpx;
+}
+
+/* ---------- 资产卡 ---------- */
 .asset-card {
   background: linear-gradient(135deg, #7f77dd, #534ab7);
   color: #fff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin: 0 24rpx 16rpx;
+  border-radius: 32rpx;
+  padding: 40rpx;
+  margin: 0 32rpx 32rpx;
+  box-shadow: var(--shadow-card);
 }
 .asset-card .label {
-  font-size: 22rpx;
+  font-size: 24rpx;
   opacity: 0.8;
 }
 .asset-card .amount {
   font-size: 56rpx;
   font-weight: 600;
   margin: 8rpx 0;
-}
-.asset-card .change {
-  font-size: 22rpx;
-  opacity: 0.9;
-}
-
-/* 收支切换 */
-.income-expense-toggle {
-  display: flex;
-  gap: 12rpx;
-  margin: 0 24rpx 16rpx;
-}
-.toggle-btn {
-  flex: 1;
-  padding: 20rpx;
-  border: 1rpx solid #d3d1c7;
-  border-radius: 16rpx;
-  background: #fff;
-  text-align: center;
-  font-size: 26rpx;
-}
-.toggle-btn.active {
-  background: #eeedfe;
-  border-color: #7f77dd;
-  color: #7f77dd;
-  font-weight: 500;
-}
-
-/* 卡片 */
-.card {
-  background: #fff;
-  border-radius: 20rpx;
-  padding: 28rpx;
-  margin: 0 24rpx 16rpx;
-  border: 1rpx solid #e8e8e8;
-}
-.summary-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.summary-main {
-  display: flex;
-  flex-direction: column;
-}
-.summary-label {
-  font-size: 24rpx;
-  color: #888780;
-}
-.summary-value {
-  font-size: 48rpx;
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.summary-sub {
+.asset-card .change {
+  font-size: 24rpx;
+  opacity: 0.9;
+}
+/* 资产卡内的收益展示 */
+.invest-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.25);
   font-size: 24rpx;
 }
-.section-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #2c2c2a;
-  margin-bottom: 20rpx;
+.invest-label {
+  opacity: 0.85;
+}
+.invest-value {
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.profit-up {
+  color: #a8f0cf;
+}
+.profit-down {
+  color: #ffc4c4;
+}
+.invest-dim {
+  margin-left: auto;
+  opacity: 0.75;
+  font-size: 22rpx;
 }
 
-/* 饼图 + 图例 */
-.pie-row {
+/* ---------- 本期收支（流量卡） ---------- */
+.flow-card {
+  background: var(--card);
+  border-radius: 24rpx;
+  padding: 28rpx 32rpx;
+  margin: 0 32rpx 24rpx;
+  border: 1rpx solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+.flow-row {
   display: flex;
   align-items: center;
-  gap: 28rpx;
-  margin-bottom: 20rpx;
 }
-.pie {
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.mini-legend {
+.flow-item {
   flex: 1;
+  min-width: 0;
 }
-.legend-row {
+/* 相邻项之间加浅分隔线（等价 H5 的 .flow-item + .flow-item） */
+.flow-with-border {
+  border-left: 1rpx solid var(--divider);
+  padding-left: 24rpx;
+}
+.flow-label {
+  font-size: 22rpx;
+  color: var(--text-muted);
+}
+.flow-value {
+  font-size: 34rpx;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-top: 6rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flow-rate {
   display: flex;
-  justify-content: space-between;
-  padding: 8rpx 0;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid var(--divider);
 }
-.legend-name {
-  font-size: 26rpx;
-  color: #5f5e5a;
+.rate-label {
+  font-size: 22rpx;
+  color: var(--text-muted);
+  flex: none;
 }
-.legend-pct {
-  font-size: 26rpx;
-  color: #888780;
+.rate-bar {
+  flex: 1;
+  height: 12rpx;
+  background: var(--divider);
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+.rate-fill {
+  display: block;
+  height: 100%;
+  border-radius: 6rpx;
+  background: linear-gradient(90deg, #7f77dd, #9b8fe8);
+}
+.rate-value {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--primary-dark);
+  font-variant-numeric: tabular-nums;
+  flex: none;
 }
 
-/* 分类列表 */
-.category-item {
+/* ---------- 近期账单 ---------- */
+.bill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.bill-title {
   display: flex;
   align-items: center;
   gap: 20rpx;
-  padding: 18rpx 0;
-  border-bottom: 1rpx solid #f1efe8;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-main);
 }
-.category-item:last-child {
-  border-bottom: none;
+.bill-sorts {
+  display: inline-flex;
+  background: var(--divider);
+  border-radius: 40rpx;
+  padding: 4rpx;
 }
-.category-icon {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
+.bill-sorts text {
+  font-size: 22rpx;
+  font-weight: 400;
+  color: var(--text-muted);
+  padding: 6rpx 20rpx;
+  border-radius: 40rpx;
+}
+.bill-sorts text.on {
+  background: #fff;
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 2rpx 6rpx rgba(38, 33, 92, 0.1);
+}
+.bill-range {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 4rpx;
+}
+.bill-range-item {
+  flex: 1;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-muted);
+  background: var(--divider);
+  border-radius: 40rpx;
+  padding: 10rpx 0;
+}
+.bill-range-item.on {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 600;
+}
+.bill-summary {
+  font-size: 22rpx;
+  color: var(--text-muted);
+  padding: 16rpx 0;
+  margin-bottom: 4rpx;
+  border-bottom: 1rpx solid var(--divider);
+}
+.bill-summary text {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bill-groups {
+  margin-top: 4rpx;
+}
+.bill-group + .bill-group {
+  margin-top: 16rpx;
+}
+.bill-day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 4rpx;
+  border-bottom: 1rpx solid var(--divider);
+}
+.bill-day-name {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text-body);
+}
+.bill-day-tag {
+  font-style: normal;
+  font-size: 22rpx;
+  font-weight: 400;
+  color: #a8a79f;
+}
+.bill-cat-ic {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+}
+.bill-day-sum {
+  display: flex;
+  gap: 20rpx;
+  font-size: 22rpx;
+}
+.bill-day-sum text {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* 借贷流水：中性灰，与收支的红/绿区分开 */
+.text-loan {
+  color: var(--text-muted);
+}
+
+/* 滑动容器：删除按钮铺在底层，条目覆盖其上，左滑即露出 */
+.bill-swipe {
+  position: relative;
+  overflow: hidden;
+}
+.bill-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 152rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30rpx;
+  background: var(--expense);
+  color: #fff;
+  font-size: 26rpx;
 }
-.category-info {
+/* 借贷流水的余额由借钱来往维护，这里不允许删除 */
+.bill-del.disabled {
+  background: #c9c7bf;
+}
+.bill-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 4rpx;
+  border-bottom: 1rpx solid #f7f6f3;
+  background: #fff;
+}
+/* 手指按住时不加过渡（跟手），松手后回弹/吸附才有动画 */
+.bill-item.swiping {
+  transition: transform 0.18s ease;
+}
+.bill-item:last-child {
+  border-bottom: none;
+}
+.bill-ic {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+.bill-info {
   flex: 1;
+  min-width: 0;
 }
-.category-name {
+.bill-merchant {
   font-size: 26rpx;
   font-weight: 500;
-}
-.category-percent {
-  font-size: 22rpx;
-  color: #888780;
-  margin-left: 8rpx;
-}
-.progress-bar {
-  height: 10rpx;
-  background: #f1efe8;
-  border-radius: 6rpx;
-  margin-top: 10rpx;
+  color: var(--text-body);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
-.progress-fill {
-  height: 100%;
-  border-radius: 6rpx;
+.bill-account {
+  font-size: 22rpx;
+  color: #a8a79f;
+  margin-top: 4rpx;
 }
-.category-amount {
-  font-size: 26rpx;
-  font-weight: 500;
+.bill-amount {
+  font-size: 28rpx;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.bill-loading,
+.bill-empty {
+  text-align: center;
+  font-size: 24rpx;
+  color: #a8a79f;
+  padding: 40rpx 0;
 }
 
-/* 浮动按钮 */
+/* ---------- 登录引导 ---------- */
+.login-lock {
+  font-size: 72rpx;
+  margin-bottom: 20rpx;
+}
+.login-text {
+  font-size: 26rpx;
+  color: var(--text-muted);
+  margin-bottom: 32rpx;
+}
+.login-btn {
+  width: 60%;
+  padding: 20rpx 0;
+  border-radius: 999rpx;
+}
+
+/* ---------- 浮动记账按钮 ---------- */
 .floating-btn {
   position: fixed;
-  bottom: 160rpx;
+  bottom: 180rpx;
   right: 32rpx;
-  width: 100rpx;
-  height: 100rpx;
+  width: 112rpx;
+  height: 112rpx;
   border-radius: 50%;
-  background: #7f77dd;
+  background: var(--primary);
   color: #fff;
-  font-size: 52rpx;
+  font-size: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 8rpx 24rpx rgba(127, 119, 221, 0.4);
   z-index: 40;
-}
-
-/* 账户弹窗 */
-.acc-icon {
-  font-size: 40rpx;
-}
-.acc-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.acc-name {
-  font-size: 30rpx;
-  font-weight: 600;
-}
-.acc-book {
-  font-size: 24rpx;
-}
-.acc-balance {
-  font-weight: 700;
-  font-size: 30rpx;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 分类明细 */
-.tx-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.tx-merchant {
-  font-size: 28rpx;
-}
-.tx-date {
-  font-size: 24rpx;
-}
-.tx-amount {
-  font-weight: 700;
-  font-size: 28rpx;
-  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
