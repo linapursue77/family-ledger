@@ -39,3 +39,7 @@ family-ledger-deploy.tar.gz
 
 # ---- 工具缓存 ----
 .playwright-cli/
+
+# ---- 临时截图（调试时随手截的界面图，不属于仓库内容）----
+# 只忽略仓库根目录，不影响 docs/ 与 miniprogram/assets/ 下的正式图片
+/*.png
