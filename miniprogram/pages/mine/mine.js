@@ -187,7 +187,9 @@ Page({
             this.data.aiProviders.findIndex((p) => p.value === cfg.provider)
           )
           this.setData({
-            aiAvailable: !!cfg.enabled,
+            // 用后端的 usable（启用 + Key + 地址 + 模型齐备），
+            // 只认 enabled 会出现「开关亮着但报告页其实还在跑本地规则」
+            aiAvailable: !!(cfg.enabled && cfg.has_key),
             aiHasKey: !!cfg.has_key,
             aiProviderIndex: idx,
             aiModel: cfg.model || this.data.aiProviders[idx].model,
@@ -361,19 +363,35 @@ Page({
   },
   /**
    * AI 开关（与 H5 一致）：
-   *   打开 → 展开配置表单，让用户就地填 Key；
-   *   关闭 → 收起配置区并把家庭成员里的 enabled 置 false，报告页回落本地规则。
-   * 未配置过时「关闭」是空操作，因为没有可停用的配置。
+   *   打开 - 已配好 Key → 直接启用并收起表单；
+   *   打开 - 还没配 Key → 展开表单让用户就地填，开关先保持关闭（没 Key 不能算启用）；
+   *   关闭 → 收起配置区并把家庭配置的 enabled 置 false，报告页回落本地规则。
    */
   async onAiToggle(e) {
     if (this._guardLogin()) return
     const on = !!e.detail.value
     if (on) {
-      // 配置已在 loadExtras 里拉过并回填，这里直接展开，不再重复请求
-      this.setData({ showAiForm: true, aiMsg: '' })
+      if (!this.data.aiHasKey) {
+        // 没 Key：只展开表单，开关回到关闭态，避免显示「已启用」但其实不可用
+        this.setData({
+          showAiForm: true,
+          aiAvailable: false,
+          aiMsg: '请先填写 API Key 并保存，保存后自动启用',
+        })
+        return
+      }
+      // 已配好 Key：直接启用
+      this.setData({ showAiForm: false, aiMsg: '' })
+      try {
+        await api.saveAiConfig({ enabled: true })
+        this.setData({ aiAvailable: true })
+        wx.showToast({ title: '已启用 AI 分析', icon: 'success' })
+      } catch (err) {
+        this.setData({ aiAvailable: false, aiMsg: err.message || '开启失败' })
+      }
       return
     }
-    // 关闭：收起表单；已配置过才需要落库停用
+    // 关闭：收起表单；已启用才需要落库停用
     this.setData({ showAiForm: false, aiMsg: '' })
     if (!this.data.aiAvailable) return
     try {
@@ -381,9 +399,8 @@ Page({
       this.setData({ aiAvailable: false })
       wx.showToast({ title: '已切回本地分析', icon: 'none' })
     } catch (err) {
-      wx.showToast({ title: err.message || '切换失败', icon: 'none' })
       // 落库失败要把开关拨回去，否则界面与配置不一致
-      this.setData({ aiAvailable: true })
+      this.setData({ aiAvailable: true, aiMsg: err.message || '切换失败' })
     }
   },
 

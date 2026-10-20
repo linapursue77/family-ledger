@@ -40,10 +40,20 @@ const aiMsg = ref('')
 const useAI = ref(localStorage.getItem('insight_use_ai') === '1')
 const aiForm = reactive({ provider: 'deepseek', base_url: '', model: '', api_key: '' })
 
-// configured=Key/接口地址/模型名齐全，此时顶部开关才能打开（开关即“启用 AI”）
-const aiConfigured = computed(
-  () => !!aiCfg.value?.has_key && !!aiForm.base_url && !!aiForm.model
-)
+/*
+ * 是否真的可用：以后端 has_key 为准，不拿表单字段判断。
+ * ★ 之前用 !!aiForm.base_url && !!aiForm.model 判断会误判——.env 里
+ *   AI_BASE_URL / AI_MODEL 有默认值，即使从没配过 Key 也算「已配置」，
+ *   于是开关显示可点，点了调接口才报错，看着就是开关有 bug。
+ * 表单只用于填写，判断一律看后端返回的 has_key。
+ */
+const aiConfigured = computed(() => !!aiCfg.value?.has_key)
+/**
+ * 配置来源为 .env 时界面只能看不能改：
+ * 那种配置由运维在服务器上维护，网页保存会写出一条 AISettings 覆盖它，
+ * 运维再改 .env 就不生效了，排查起来很费劲。
+ */
+const aiFromEnv = computed(() => aiCfg.value?.source === 'env' && !!aiCfg.value?.has_key)
 const aiStateText = computed(() =>
   !aiConfigured.value ? '未配置' : useAI.value ? '已开启' : '已关闭'
 )
@@ -63,16 +73,27 @@ async function loadAi() {
     aiForm.provider = PROVIDERS[r.provider] ? r.provider : 'custom'
     aiForm.base_url = r.base_url || ''
     aiForm.model = r.model || ''
-    // 界面存过配置时，开关状态以库里为准（家庭共享同一份配置）
-    if (r.source === 'ui') {
-      useAI.value = !!r.enabled
-      localStorage.setItem('insight_use_ai', r.enabled ? '1' : '0')
-    }
+    /*
+     * 开关状态始终以后端为准：配置是家庭共享的，
+     * 如果沿用 localStorage，换设备或对方在网页改过就会显示成旧状态，
+     * 用户点一下开关反而是「取消」自己以为的开启，看着像开关失灵。
+     *
+     * 两种情况都采信 enabled：
+     *   source=ui  → 界面保存过配置
+     *   source=env → .env 里配了 AI_API_KEY，此时只读，界面不能改（见 canEditAi）
+     */
+    useAI.value = !!r.enabled
+    localStorage.setItem('insight_use_ai', r.enabled ? '1' : '0')
   } catch (e) {
     aiCfg.value = null
   }
 }
 async function toggleAI() {
+  // .env 配的 AI 由服务器维护，界面不提供切换，只给出说明
+  if (aiFromEnv.value) {
+    aiMsg.value = '当前使用服务器 .env 中配置的大模型，如需在界面修改请先移除服务器上的 AI_API_KEY'
+    return
+  }
   if (!aiConfigured.value) {
     // 没配置时打开开关 = 要求配置：直接展开表单，让用户就地填完
     showAiForm.value = true
@@ -81,11 +102,16 @@ async function toggleAI() {
       : '还没配置大模型：填好 API Key 并保存后，这里就能切换到 AI 分析'
     return
   }
-  // 已配置：开关只控制启用/停用，失败了回滚，避免界面与库里不一致
+  /*
+   * 已配置：开关双向切换，与小程序一致。
+   *   开 → 启用 AI，并收起配置表单
+   *   关 → 停用 AI，同样收起表单（避免留一块空表单占屏）
+   * 失败一律回滚，避免界面与库里不一致。
+   */
   aiMsg.value = ''
   const next = !useAI.value
   useAI.value = next
-  // 关掉开关就把配置区收起，省得留一块空表单占着屏幕
+  // ← 关键：两个方向都要收起。之前只在关闭时收起，开启后表单仍挂着
   showAiForm.value = false
   localStorage.setItem('insight_use_ai', next ? '1' : '0')
   try {
@@ -121,8 +147,12 @@ async function saveAi() {
       base_url: aiForm.base_url,
       model: aiForm.model,
       api_key: aiForm.api_key,
-      // 表单里不再放重复的启用开关，以顶部「AI 智能分析」为准
-      enabled: useAI.value,
+      /*
+       * 保存即启用，与小程序「保存并启用」一致。
+       * 之前传 useAI.value：首次填 Key 时它还是 false，
+       * 保存完就成了「已配置但未启用」，用户得再点一次开关，多一步还容易以为没生效。
+       */
+      enabled: true,
     })
     useAI.value = !!aiCfg.value.enabled
     localStorage.setItem('insight_use_ai', useAI.value ? '1' : '0')
@@ -462,8 +492,12 @@ onMounted(() => {
         <span class="menu-icon">🤖</span>
         <span class="menu-main">
           <span class="menu-text">AI 智能分析</span>
+          <!-- 服务器 .env 配置：只读，说明来源避免用户点了没反应 -->
+          <span v-if="aiFromEnv" class="menu-desc">
+            由服务器 .env 配置，界面不可修改
+          </span>
           <!-- 未配置时说明「现在走本地」，配好就不再解释，避免和开关状态重复 -->
-          <span v-if="!aiConfigured" class="menu-desc">
+          <span v-else-if="!aiConfigured" class="menu-desc">
             未配置大模型，报告页自动改用本地规则分析；点右侧开关即可填写
           </span>
           <!-- 已启用且表单收起时，给一个改配置的入口；关掉开关就一并消失 -->
@@ -488,7 +522,7 @@ onMounted(() => {
       -->
       <div v-if="aiMsg" class="ai-msg">{{ aiMsg }}</div>
 
-      <div v-if="showAiForm" class="ai-form">
+      <div v-if="showAiForm && !aiFromEnv" class="ai-form">
         <div class="ai-field">
           <label>服务商</label>
           <select v-model="aiForm.provider" @change="setProvider(aiForm.provider)">
