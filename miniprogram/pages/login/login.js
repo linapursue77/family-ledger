@@ -21,6 +21,13 @@ Page({
   /** 登录成功后统一落 token 并进首页 */
   _afterLogin(data) {
     wx.setStorageSync('fl_token', data.token.access)
+    /*
+     * 存 refresh：access 只有 2 小时，没有 refresh 的话过期就只能重新登录。
+     * 后端开了轮换，每次刷新都会换新的 refresh，request.js 里会同步存回。
+     */
+    if (data.token && data.token.refresh) {
+      wx.setStorageSync('fl_refresh', data.token.refresh)
+    }
     if (data.profile && data.profile.user && data.profile.user.nickname) {
       wx.setStorageSync('fl_nickname', data.profile.user.nickname)
     }

@@ -10,6 +10,52 @@ const BOOKS = [
 ]
 const ROLE_TEXT = { owner: '主账号', member: '成员' }
 
+// 授权项：与 H5 Family.vue 的 PERM_CONFIG 一一对应，改一端记得同步另一端
+// choice 为二选一，switch 为开关
+const PERM_CONFIG = [
+  {
+    key: 'report_view',
+    label: '查看账单报表',
+    desc: '对方能看到哪些账单与统计',
+    type: 'choice',
+    options: [
+      { v: 'all', l: '全家庭' },
+      { v: 'own', l: '仅自己' },
+    ],
+  },
+  {
+    key: 'account_view',
+    label: '查看账户资产',
+    desc: '对方能看到哪些账户与余额',
+    type: 'choice',
+    options: [
+      { v: 'all', l: '全家庭' },
+      { v: 'own', l: '仅自己' },
+    ],
+  },
+  { key: 'allow_record', label: '允许记账', desc: '关闭后只能查看，不能新增账单', type: 'switch' },
+  { key: 'show_private', label: '可见私密账目', desc: '是否包含标记为「私密」的账目', type: 'switch' },
+  {
+    key: 'settings_level',
+    label: '家庭设置权限',
+    desc: '能否邀请成员、调整阈值与授权',
+    type: 'choice',
+    options: [
+      { v: 'full', l: '可管理' },
+      { v: 'basic', l: '仅查看' },
+    ],
+  },
+]
+
+// 默认权限：新成员可看全家庭、能记账、看不到私密、不能改家庭设置
+const DEFAULT_PERMS = {
+  report_view: 'all',
+  account_view: 'all',
+  allow_record: true,
+  show_private: false,
+  settings_level: 'basic',
+}
+
 function centsToYuanText(cents) {
   return String(yuan(cents || 0))
 }
@@ -25,12 +71,19 @@ Page({
     limitText: '',
     books: BOOKS,
 
-    // 邀请
+    // 邀请：perms 是预设权限，随邀请一起提交；permList 供模板渲染
     showInvite: false,
     inviteNickname: '',
     inviteContact: '',
     newToken: '',
     inviting: false,
+    permList: PERM_CONFIG,
+    perms: { ...DEFAULT_PERMS },
+
+    // 授权调整（主账号对已有成员）
+    showPerm: false,
+    permForm: { ...DEFAULT_PERMS },
+    permTarget: null,
 
     // 成员
     showMember: false,
@@ -50,7 +103,20 @@ Page({
     this.load()
   },
 
-  // ---- 分享：右上角菜单与 token 框里的按钮都走这里
+  /*
+   * 分享：小程序里邀请靠「转发小程序卡片」实现，行业通用做法是
+   *   - 页面 onShareAppMessage 返回带 token 的 path
+   *   - 按钮用 <button open-type="share"> 拉起转发面板
+   * 另外要把「转发」入口显式打开（默认只开转发给朋友，朋友圈要单独开），
+   * 否则用户从右上角菜单找不到分享朋友圈。
+   */
+  onLoad() {
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline'],
+    })
+  },
+
   onShareAppMessage() {
     return toAppMessage(this._sharePayload || appPayload())
   },
@@ -120,8 +186,25 @@ Page({
 
   // ---- 邀请
   openInvite() {
-    this.setData({ showInvite: true, inviteNickname: '', inviteContact: '', newToken: '' })
+    // 每次打开都重置成默认权限，避免沿用上次的选择造成误授权
+    this.setData({
+      showInvite: true,
+      inviteNickname: '',
+      inviteContact: '',
+      newToken: '',
+      perms: { ...DEFAULT_PERMS },
+    })
     this._sharePayload = null
+  },
+
+  /** 权限项切换：choice 直接覆盖，switch 取反 */
+  onPermTap(e) {
+    const { key, val } = e.currentTarget.dataset
+    const cur = this.data.perms
+    // dataset 里拿到的 val 只有 choice 才有；switch 走取反
+    this.setData({
+      perms: { ...cur, [key]: val === undefined ? !cur[key] : val },
+    })
   },
   closeInvite() {
     this.setData({ showInvite: false })
@@ -143,6 +226,8 @@ Page({
       const res = await api.createInvite({
         nickname,
         contact: (this.data.inviteContact || '').trim(),
+        // 预设权限：接受邀请时由后端写入成员权限
+        permissions: { ...this.data.perms },
       })
       // token 只在生成这一刻返回一次，之后列表里查不到
       const token = res.token || ''
@@ -218,6 +303,40 @@ Page({
       wx.showToast({ title: e.message || '保存失败', icon: 'none' })
     }
   },
+  /** 打开授权调整弹层：回填该成员当前权限 */
+  openPerm() {
+    const m = this.data.current
+    if (!m) return
+    this.setData({
+      showPerm: true,
+      permTarget: m,
+      permForm: { ...DEFAULT_PERMS, ...(m.permissions || {}) },
+    })
+  },
+  closePerm() {
+    this.setData({ showPerm: false })
+  },
+  onPermFormTap(e) {
+    const { key, val } = e.currentTarget.dataset
+    const cur = this.data.permForm
+    this.setData({
+      permForm: { ...cur, [key]: val === undefined ? !cur[key] : val },
+    })
+  },
+  async onSavePerm() {
+    const m = this.data.permTarget
+    if (!m) return
+    try {
+      // 后端 MemberPermissionSerializer 收扁平字段（partial=True 合并到原权限上）
+      await api.updateMemberPerms(m.id, { ...this.data.permForm })
+      wx.showToast({ title: '授权已更新', icon: 'success' })
+      this.setData({ showPerm: false, showMember: false })
+      await this.load()
+    } catch (e) {
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' })
+    }
+  },
+
   onRemoveMember() {
     const m = this.data.current
     if (!m) return

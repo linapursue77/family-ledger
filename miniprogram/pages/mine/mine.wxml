@@ -58,13 +58,13 @@
       </view>
       <text class="menu-value">{{aiAvailable ? '已接入' : '本地分析'}}</text>
       <!--
-        打开态用绿色，与「已启用」语义对应。
-        checked 绑 aiAvailable（真实启用状态）而不是 showAiForm（表单展开态）：
-        绑展开态会出现「表单收起了但开关还亮着 / 开关关了其实仍启用」的错位。
+        绿色只取决于「用户是否已打开」，绑 aiSwitchOn 而不是 aiAvailable。
+        绑 aiAvailable 的话没配 Key 时点开关会立刻弹回灰色，像点不动；
+        用户点它本意就是要用 AI，应该立刻变绿并展开配置表单。
       -->
       <switch
         class="ai-switch"
-        checked="{{aiAvailable}}"
+        checked="{{aiSwitchOn}}"
         color="#1d9e75"
         bindchange="onAiToggle"
       />

@@ -86,14 +86,39 @@ Page({
     categoryMap: {},
     accountMap: {},
     metaLoaded: false,
+
+    // 是否有登录态：决定页面是拉数据还是展示登录引导
+    loggedIn: true,
   },
 
   onShow() {
     this.loadAll()
   },
 
+  /**
+   * 下拉刷新：重新拉一遍首页数据。
+   * 必须 await 后再 stopPullDownRefresh，否则转圈会立刻消失、看着像没刷新成功。
+   * finally 里收，保证接口失败时也能收起，不会卡在刷新态。
+   */
+  async onPullDownRefresh() {
+    try {
+      await this.loadAll()
+    } finally {
+      wx.stopPullDownRefresh()
+    }
+  },
+
   async loadAll() {
-    this.setData({ loading: true })
+    /*
+     * 未登录不发请求：首页一进来就要 overview/accounts/transactions 四五个接口，
+     * 没 token 时每个都 401，白打一轮还刷一屏错误。
+     * 这里直接置空并给登录引导，等用户登录回来 onShow 再取数。
+     */
+    if (!wx.getStorageSync('fl_token')) {
+      this.setData({ loading: false, loggedIn: false })
+      return
+    }
+    this.setData({ loading: true, loggedIn: true })
     try {
       const params = { preset: this.data.activePreset }
       if (this.data.activePreset === 'custom') {

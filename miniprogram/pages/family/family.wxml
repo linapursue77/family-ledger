@@ -89,6 +89,38 @@
         <text class="field-label">联系方式</text>
         <input placeholder="选填，方便你记住" value="{{inviteContact}}" bindinput="onInviteContact" />
       </view>
+
+      <!-- 预设权限：与 H5 的「预设权限」一致，决定新成员能看到什么 -->
+      <view class="perm-block">
+        <text class="perm-title">预设权限</text>
+        <view wx:for="{{permList}}" wx:key="key" class="perm-row">
+          <view class="pr-main">
+            <text class="pr-label">{{item.label}}</text>
+            <text class="pr-desc">{{item.desc}}</text>
+          </view>
+          <!-- 三选一/二选一：胶囊按钮 -->
+          <view wx:if="{{item.type === 'choice'}}" class="pr-opts">
+            <text
+              wx:for="{{item.options}}"
+              wx:for-item="o"
+              wx:key="v"
+              class="pr-opt {{perms[item.key] === o.v ? 'on' : ''}}"
+              data-key="{{item.key}}"
+              data-val="{{o.v}}"
+              bindtap="onPermTap"
+            >{{o.l}}</text>
+          </view>
+          <!-- 开关类 -->
+          <view
+            wx:else
+            class="mini-switch {{perms[item.key] ? 'on' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="onPermTap"
+          ><view class="ms-dot"></view></view>
+        </view>
+        <view class="perm-note">加入后可在成员详情里随时调整。</view>
+      </view>
+
       <button class="btn-primary {{inviting ? 'disabled' : ''}}" bindtap="onCreateInvite">
         {{inviting ? '生成中…' : '生成邀请码'}}
       </button>
@@ -96,9 +128,12 @@
       <view wx:if="{{newToken}}" class="token-box">
         <text class="token-label">邀请码（7 天内有效，只显示这一次）</text>
         <text class="token-value" user-select>{{newToken}}</text>
-        <!-- 分享给微信好友：发出去是小程序卡片，对方点开直接进 join 页 -->
-        <button class="btn-primary share-btn" open-type="share">
-          分享给微信好友
+        <!--
+          微信生态里「分享」统一用微信绿，用户对绿色按钮的预期就是转发，
+          用主色紫会和「保存/确定」混淆。
+        -->
+        <button class="share-btn" open-type="share">
+          <text class="share-ic">↗</text> 分享给微信好友
         </button>
         <view class="token-copy" bindtap="copyToken">复制邀请码</view>
         <view class="form-note">也可以复制链接或邀请码给对方，在网页版「加入家庭」里填入。</view>
@@ -129,9 +164,47 @@
       <button class="btn-primary" bindtap="onSaveMember">保存</button>
 
       <block wx:if="{{isOwner && current.role !== 'owner'}}">
+        <view class="action-item" bindtap="openPerm">🔐 调整授权</view>
         <view class="action-item" bindtap="onTransferOwner">👑 转让主账号给 TA</view>
         <view class="action-item danger" bindtap="onRemoveMember">🗑 移除成员</view>
       </block>
+    </view>
+  </view>
+
+  <!-- 授权调整：即时生效，与 H5 的「调整授权」弹层同口径 -->
+  <view wx:if="{{showPerm}}" class="sheet-mask" bindtap="closePerm">
+    <view class="sheet" catchtap>
+      <view class="sheet-head">
+        <text class="sheet-title">调整授权 · {{permTarget.display}}</text>
+        <text class="sheet-close" bindtap="closePerm">×</text>
+      </view>
+      <view class="perm-block">
+        <view wx:for="{{permList}}" wx:key="key" class="perm-row">
+          <view class="pr-main">
+            <text class="pr-label">{{item.label}}</text>
+            <text class="pr-desc">{{item.desc}}</text>
+          </view>
+          <view wx:if="{{item.type === 'choice'}}" class="pr-opts">
+            <text
+              wx:for="{{item.options}}"
+              wx:for-item="o"
+              wx:key="v"
+              class="pr-opt {{permForm[item.key] === o.v ? 'on' : ''}}"
+              data-key="{{item.key}}"
+              data-val="{{o.v}}"
+              bindtap="onPermFormTap"
+            >{{o.l}}</text>
+          </view>
+          <view
+            wx:else
+            class="mini-switch {{permForm[item.key] ? 'on' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="onPermFormTap"
+          ><view class="ms-dot"></view></view>
+        </view>
+      </view>
+      <button class="btn-primary" bindtap="onSavePerm">保存授权</button>
+      <view class="form-note">保存后立即生效，TA 下次刷新即可看到新范围。</view>
     </view>
   </view>
 </view>

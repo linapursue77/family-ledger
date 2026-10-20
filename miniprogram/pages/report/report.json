@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "报告"
+  "navigationBarTitleText": "报告",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

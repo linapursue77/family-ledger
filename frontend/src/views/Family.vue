@@ -625,7 +625,8 @@ onMounted(async () => {
             <div class="token">{{ inviteResult.token }}</div>
           </div>
           <div class="f-note">邀请码仅显示这一次，遗失后请重新生成。</div>
-          <button class="btn btn-primary full-btn" @click="shareInvite">分享给微信好友</button>
+          <!-- 微信生态里分享按钮统一用微信绿，与「保存/完成」等主色按钮区分 -->
+          <button class="btn full-btn share-btn" @click="shareInvite">↗ 分享给微信好友</button>
           <button class="btn full-btn ghost-btn" @click="showInvite = false">完成</button>
         </template>
       </div>
@@ -914,6 +915,12 @@ onMounted(async () => {
 .ghost-btn {
   background: #f1efe8;
   color: var(--text-sub);
+}
+/* 微信绿：用户对绿色按钮的预期就是「转发出去」，与主色紫的保存类按钮区分开 */
+.share-btn {
+  background: #07c160;
+  color: #fff;
+  font-weight: 600;
 }
 
 /* 微信内分享引导遮罩 */

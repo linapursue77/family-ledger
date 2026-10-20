@@ -54,9 +54,19 @@ const aiConfigured = computed(() => !!aiCfg.value?.has_key)
  * 运维再改 .env 就不生效了，排查起来很费劲。
  */
 const aiFromEnv = computed(() => aiCfg.value?.source === 'env' && !!aiCfg.value?.has_key)
-const aiStateText = computed(() =>
-  !aiConfigured.value ? '未配置' : useAI.value ? '已开启' : '已关闭'
-)
+/**
+ * 开关的视觉状态 = 用户是否想用 AI。
+ * ★ 不能绑 aiConfigured：没配 Key 时开关永远灰着，用户点不动，
+ *   而实际上「点了就是要用 AI」，应该立刻变绿并弹出配置表单。
+ *   是否真正生效由后端 enabled 决定，保存成功后才算数。
+ */
+const aiSwitchOn = computed(() => useAI.value)
+const aiStateText = computed(() => {
+  if (aiFromEnv.value) return '已开启'
+  if (!useAI.value) return '已关闭'
+  // 开关开着但还没存过 Key：提示还差一步，避免用户以为已经能用
+  return aiConfigured.value ? '已开启' : '待配置'
+})
 
 function setProvider(p) {
   aiForm.provider = p
@@ -94,32 +104,46 @@ async function toggleAI() {
     aiMsg.value = '当前使用服务器 .env 中配置的大模型，如需在界面修改请先移除服务器上的 AI_API_KEY'
     return
   }
-  if (!aiConfigured.value) {
-    // 没配置时打开开关 = 要求配置：直接展开表单，让用户就地填完
-    showAiForm.value = true
-    aiMsg.value = aiCfg.value?.has_key
-      ? '还差接口地址或模型名：在下方补全后保存'
-      : '还没配置大模型：填好 API Key 并保存后，这里就能切换到 AI 分析'
+
+  const next = !useAI.value
+  // ★ 先切开关：点一下必须立刻变绿/变灰，不能等接口回来才有反馈
+  useAI.value = next
+  localStorage.setItem('insight_use_ai', next ? '1' : '0')
+  aiMsg.value = ''
+
+  if (!next) {
+    /*
+     * 关闭：收起表单 + 后端置 enabled=false，
+     * 报告页随之回落本地规则分析。没保存过配置的无需调接口。
+     */
+    showAiForm.value = false
+    if (!aiConfigured.value) return
+    try {
+      aiCfg.value = await ledgerApi.saveAiConfig({ enabled: false })
+      aiMsg.value = '已切回本地分析'
+    } catch (e) {
+      // 落库失败要把开关拨回去，否则界面与配置不一致
+      useAI.value = true
+      localStorage.setItem('insight_use_ai', '1')
+      aiMsg.value = e?.message || '切换失败'
+    }
     return
   }
-  /*
-   * 已配置：开关双向切换，与小程序一致。
-   *   开 → 启用 AI，并收起配置表单
-   *   关 → 停用 AI，同样收起表单（避免留一块空表单占屏）
-   * 失败一律回滚，避免界面与库里不一致。
-   */
-  aiMsg.value = ''
-  const next = !useAI.value
-  useAI.value = next
-  // ← 关键：两个方向都要收起。之前只在关闭时收起，开启后表单仍挂着
-  showAiForm.value = false
-  localStorage.setItem('insight_use_ai', next ? '1' : '0')
+
+  // 打开：展开配置弹窗；已经配好 Key 的直接启用
+  showAiForm.value = true
+  if (!aiConfigured.value) {
+    aiMsg.value = '还没配置大模型：填好 API Key 并保存后，报告页就会用 AI 分析'
+    return
+  }
   try {
-    aiCfg.value = await ledgerApi.saveAiConfig({ enabled: next })
+    aiCfg.value = await ledgerApi.saveAiConfig({ enabled: true })
+    showAiForm.value = false
+    aiMsg.value = '已启用，去报告页点 AI 即可'
   } catch (e) {
-    useAI.value = !next
-    localStorage.setItem('insight_use_ai', useAI.value ? '1' : '0')
-    aiMsg.value = e?.message || '切换失败'
+    useAI.value = false
+    localStorage.setItem('insight_use_ai', '0')
+    aiMsg.value = e?.message || '开启失败'
   }
 }
 async function testAi() {
@@ -508,9 +532,14 @@ onMounted(() => {
           >修改配置</span>
         </span>
         <span class="menu-value">{{ aiStateText }}</span>
+        <!--
+          绿色只取决于「用户是否已打开」。
+          之前还要求 aiConfigured，没配 Key 时开关永远灰着点不动，
+          而用户点它本意就是要用 AI，应当立刻变绿并弹出配置。
+        -->
         <span
           class="switch"
-          :class="{ on: useAI && aiConfigured, off: !aiConfigured }"
+          :class="{ on: aiSwitchOn }"
           @click.stop="toggleAI"
         >
           <span class="switch-dot"></span>

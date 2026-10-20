@@ -45,6 +45,9 @@ module.exports = {
   invitePreview: (token) => request('GET', '/families/invitations/preview/', { token }),
   acceptInvite: (token) => request('POST', '/families/invitations/accept/', { token }),
   updateMember: (id, data) => request('PATCH', `/families/members/${id}/`, data),
+  // 授权调整：扁平字段（report_view/account_view/allow_record/show_private/settings_level）
+  updateMemberPerms: (id, data) =>
+    request('PATCH', `/families/members/${id}/permissions/`, data),
   removeMember: (id) => request('DELETE', `/families/members/${id}/`),
   transferOwner: (id) => request('POST', `/families/members/${id}/transfer-owner/`),
   thresholds: () => request('GET', '/families/thresholds/'),

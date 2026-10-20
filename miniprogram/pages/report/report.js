@@ -130,6 +130,18 @@ Page({
     this.load()
   },
 
+  /**
+   * 下拉刷新：报告与智能分析一起重取。
+   * 两者都取完才收起转圈，避免数字更新了、分析还是旧的。
+   */
+  async onPullDownRefresh() {
+    try {
+      await Promise.all([this.load(), this.loadInsight()])
+    } finally {
+      wx.stopPullDownRefresh()
+    }
+  },
+
   // ---------- 加载
   async load() {
     this.setData({ loading: true })

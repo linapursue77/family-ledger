@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "钱来钱往记账",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark",
   "usingComponents": {
     "tx-detail-sheet": "/components/tx-detail-sheet/tx-detail-sheet"
   }

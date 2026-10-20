@@ -38,8 +38,12 @@ Page({
     ownerText: '未设置',
     inviteText: '›',
 
-    // 智能分析：aiAvailable 是「家庭是否已配好 Key」，showAiForm 是配置区展开态
+    // 智能分析三态分开，避免互相顶掉：
+    //   aiSwitchOn  开关视觉（用户是否已打开）
+    //   aiAvailable 真正可用（enabled + 有 Key）
+    //   showAiForm  配置区是否展开
     aiAvailable: false,
+    aiSwitchOn: false,
     showAiForm: false,
     // 配置表单（与 H5 Mine.vue 的 aiForm 字段一一对应）
     aiProviders: [
@@ -71,6 +75,19 @@ Page({
 
   onShow() {
     this.load()
+  },
+
+  /**
+   * 下拉刷新：主信息与各模块状态一起重取。
+   * load() 内部会再触发 loadExtras()，这里 await 它即可，
+   * 拉完才 stop，保证转圈时间和实际耗时一致。
+   */
+  async onPullDownRefresh() {
+    try {
+      await this.load()
+    } finally {
+      wx.stopPullDownRefresh()
+    }
   },
 
   async load() {
@@ -190,6 +207,8 @@ Page({
             // 用后端的 usable（启用 + Key + 地址 + 模型齐备），
             // 只认 enabled 会出现「开关亮着但报告页其实还在跑本地规则」
             aiAvailable: !!(cfg.enabled && cfg.has_key),
+            // 开关视觉跟随后端启用状态，页面重进时不会丢失
+            aiSwitchOn: !!cfg.enabled,
             aiHasKey: !!cfg.has_key,
             aiProviderIndex: idx,
             aiModel: cfg.model || this.data.aiProviders[idx].model,
@@ -362,45 +381,45 @@ Page({
     wx.navigateTo({ url: '/pages/family/family' })
   },
   /**
-   * AI 开关（与 H5 一致）：
+   * AI 开关（与 H5 一致）：点一下立刻变色，再看是否需要配置。
    *   打开 - 已配好 Key → 直接启用并收起表单；
-   *   打开 - 还没配 Key → 展开表单让用户就地填，开关先保持关闭（没 Key 不能算启用）；
-   *   关闭 → 收起配置区并把家庭配置的 enabled 置 false，报告页回落本地规则。
+   *   打开 - 还没配 Key → 开关保持绿色并展开表单，让用户就地填；
+   *   关闭 → 变灰 + 收起配置区 + 后端 enabled=false，报告页回落本地规则。
+   * aiSwitchOn 是视觉态，aiAvailable 是「真正可用」，两者分开才不会点不动。
    */
   async onAiToggle(e) {
     if (this._guardLogin()) return
     const on = !!e.detail.value
-    if (on) {
-      if (!this.data.aiHasKey) {
-        // 没 Key：只展开表单，开关回到关闭态，避免显示「已启用」但其实不可用
-        this.setData({
-          showAiForm: true,
-          aiAvailable: false,
-          aiMsg: '请先填写 API Key 并保存，保存后自动启用',
-        })
-        return
-      }
-      // 已配好 Key：直接启用
-      this.setData({ showAiForm: false, aiMsg: '' })
+    // 先给视觉反馈，不能等接口回来才变色
+    this.setData({ aiSwitchOn: on, aiMsg: '' })
+
+    if (!on) {
+      // 关闭：收起表单；没配置过的无需调接口
+      this.setData({ showAiForm: false })
+      if (!this.data.aiAvailable) return
       try {
-        await api.saveAiConfig({ enabled: true })
-        this.setData({ aiAvailable: true })
-        wx.showToast({ title: '已启用 AI 分析', icon: 'success' })
+        await api.saveAiConfig({ enabled: false })
+        this.setData({ aiAvailable: false })
+        wx.showToast({ title: '已切回本地分析', icon: 'none' })
       } catch (err) {
-        this.setData({ aiAvailable: false, aiMsg: err.message || '开启失败' })
+        // 落库失败要把开关拨回去，否则界面与配置不一致
+        this.setData({ aiSwitchOn: true, aiAvailable: true, aiMsg: err.message || '切换失败' })
       }
       return
     }
-    // 关闭：收起表单；已启用才需要落库停用
-    this.setData({ showAiForm: false, aiMsg: '' })
-    if (!this.data.aiAvailable) return
+
+    // 打开：展开配置表单；已有 Key 的直接启用
+    this.setData({ showAiForm: true })
+    if (!this.data.aiHasKey) {
+      this.setData({ aiMsg: '请填写 API Key 并保存，保存后即启用' })
+      return
+    }
     try {
-      await api.saveAiConfig({ enabled: false })
-      this.setData({ aiAvailable: false })
-      wx.showToast({ title: '已切回本地分析', icon: 'none' })
+      await api.saveAiConfig({ enabled: true })
+      this.setData({ aiAvailable: true, showAiForm: false })
+      wx.showToast({ title: '已启用 AI 分析', icon: 'success' })
     } catch (err) {
-      // 落库失败要把开关拨回去，否则界面与配置不一致
-      this.setData({ aiAvailable: true, aiMsg: err.message || '切换失败' })
+      this.setData({ aiSwitchOn: false, aiAvailable: false, aiMsg: err.message || '开启失败' })
     }
   },
 
@@ -475,6 +494,8 @@ Page({
       })
       this.setData({
         aiAvailable: true,
+        // 保存即启用：开关也要跟着变绿，否则用户看不出已经生效
+        aiSwitchOn: true,
         aiHasKey: true,
         aiApiKey: '',
         showAiForm: false,

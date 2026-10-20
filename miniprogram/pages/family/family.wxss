@@ -187,16 +187,129 @@
   font-size: 26rpx;
   color: var(--primary);
 }
-/* 邀请分享按钮：button 自带边距/边框要清掉，和下方复制链接对齐 */
+/*
+ * 邀请分享按钮：微信生态里「分享/转发」统一用微信绿（#07c160），
+ * 用户对绿色按钮的预期就是"发出去"，用主色紫会与保存类按钮混淆。
+ * 原生 button 的默认边框、背景、宽度要一并重置，否则会比其他按钮胖一圈。
+ */
 .share-btn {
   margin: 20rpx 0 16rpx;
-  padding: 20rpx 0;
+  padding: 22rpx 0;
+  width: 100%;
   border-radius: 16rpx;
+  background: #07c160;
+  color: #fff;
   font-size: 30rpx;
+  font-weight: 600;
   line-height: normal;
+  border: none;
 }
 .share-btn::after {
   border: none;
+}
+/* 转发箭头：换个更贴近微信的图标语义，不引图标库 */
+.share-ic {
+  font-size: 30rpx;
+  margin-right: 4rpx;
+}
+.share-btn:active {
+  background: #06ad56;
+}
+
+/* ---------- 授权项（邀请预设 / 成员授权共用） ---------- */
+.perm-block {
+  margin: 24rpx 0 8rpx;
+  padding: 20rpx 24rpx;
+  background: #faf9f6;
+  border: 1rpx solid var(--border);
+  border-radius: 16rpx;
+}
+.perm-title {
+  display: block;
+  font-size: 24rpx;
+  color: var(--text-sub);
+  font-weight: 600;
+  padding-bottom: 8rpx;
+}
+.perm-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--divider);
+}
+.perm-row:last-child {
+  border-bottom: none;
+}
+.pr-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.pr-label {
+  font-size: 28rpx;
+  color: var(--text-main);
+}
+.pr-desc {
+  font-size: 21rpx;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+/* 二选一胶囊：与页面其它 chips 同一套语言 */
+.pr-opts {
+  flex: none;
+  display: flex;
+  gap: 8rpx;
+}
+.pr-opt {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: var(--text-sub);
+  background: #fff;
+  border: 1rpx solid var(--border);
+  white-space: nowrap;
+}
+.pr-opt.on {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+/* 开关类：纯 CSS 小开关，避免原生 switch 撑高行 */
+.mini-switch {
+  flex: none;
+  width: 76rpx;
+  height: 44rpx;
+  border-radius: 999rpx;
+  background: #dcdad3;
+  position: relative;
+  transition: background 0.2s;
+}
+.mini-switch .ms-dot {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.16);
+  transition: transform 0.2s;
+}
+.mini-switch.on {
+  background: var(--income);
+}
+.mini-switch.on .ms-dot {
+  transform: translateX(32rpx);
+}
+.perm-note {
+  font-size: 21rpx;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-top: 12rpx;
 }
 
 .action-item {
