@@ -369,8 +369,11 @@ onBeforeUnmount(() => {
             class="score-ring"
             :style="{ '--pct': insight.score ?? 0, '--ring': scoreColor(insight.score) }"
           >
-            <span class="score-num">{{ insight.score ?? '--' }}</span>
-            <span class="score-unit">分</span>
+            <!-- 数字放在独立容器里绝对居中，避免被白心遮挡或视觉偏位 -->
+            <div class="score-center">
+              <span class="score-num">{{ insight.score ?? '--' }}</span>
+              <span class="score-unit">分</span>
+            </div>
           </div>
           <div class="insight-hero-main">
             <div class="score-label">财务健康度 · {{ insight.score_label }}</div>
@@ -712,10 +715,9 @@ onBeforeUnmount(() => {
   height: 62px;
   border-radius: 50%;
   background: conic-gradient(var(--ring) calc(var(--pct) * 1%), #f1efe8 0);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  /* 数字改为绝对居中：flex 居中在 conic-gradient 圆环里会受 ::after 白心 */
+  /* 绘制顺序影响，视觉上偏左上，用 left/top 50% + translate 才真正居中 */
+  display: block;
 }
 .score-ring::after {
   content: '';
@@ -723,10 +725,22 @@ onBeforeUnmount(() => {
   inset: 7px;
   border-radius: 50%;
   background: #fff;
+  /* 白心压在底色上、但必须在文字下方 */
+  z-index: 0;
+}
+/* 文字独立容器：绝对定位到正中，z-index 高于白心 */
+.score-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
 }
 .score-num {
-  position: relative;
-  z-index: 1;
   font-size: 19px;
   font-weight: 700;
   color: var(--text-main);
@@ -734,10 +748,9 @@ onBeforeUnmount(() => {
   line-height: 1;
 }
 .score-unit {
-  position: relative;
-  z-index: 1;
   font-size: 10px;
   color: var(--text-muted);
+  margin-top: 1px;
 }
 .insight-hero-main {
   flex: 1;

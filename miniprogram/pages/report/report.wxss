@@ -211,11 +211,14 @@
   font-weight: 700;
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  /* 固定行高：不同分数位数下高度一致，数字才不会上下跳 */
+  line-height: 1.05;
 }
 .score-unit {
   font-size: 20rpx;
   color: var(--text-muted);
+  line-height: 1.1;
+  margin-top: 2rpx;
 }
 .insight-hero-main {
   flex: 1;
