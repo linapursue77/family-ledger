@@ -7,6 +7,10 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+# next_after 的推进上限（周期数）。只是防死循环的护栏，
+# 正常间隔（1~99）下几十次就够，不会影响真实排期。
+MAX_PERIOD_STEPS = 1000
+
 
 def _uuid():
     return uuid4().hex
@@ -168,7 +172,11 @@ class RecurringRule(models.Model):
 
     # ------------------------------------------------------------------ 排期
     def schedule_text(self):
-        """人话描述频率，如「每月 5 日」「每周 一」「每 2 天」。"""
+        """人话描述频率，如「每月 5 日」「每周 一」「每 2 天」。
+
+        ★ 每月规则的「几号」优先取 day_of_month；没填时用开始日期的日号兜底，
+          与实际排期（next_after 同样兜底成 1 号）保持一致，避免展示和真实执行日不符。
+        """
         if self.frequency == self.FREQ_DAILY:
             return '每天' if self.interval <= 1 else f'每 {self.interval} 天'
         if self.frequency == self.FREQ_WEEKLY:
@@ -178,6 +186,26 @@ class RecurringRule(models.Model):
         day = self.day_of_month or 1
         day_text = f'{day} 日' if day != self.MONTH_END else '月末'
         return f'每月 {day_text}' if self.interval <= 1 else f'每 {self.interval} 月 {day_text}'
+
+    def enable(self, today=None):
+        """重新启用规则。
+
+        ★ 停用期间 next_run 会停在过去（谁也不会去推它），直接置 is_active=True
+          的话规则依然「看起来是开着的，但永远等不到下一次执行」。
+          所以启用时把早于今天的排期顺到下一个周期点。
+          返回是否有改动，供调用方决定要不要落库。
+        """
+        today = today or timezone.now().date()
+        changed = False
+        if not self.is_active:
+            self.is_active = True
+            changed = True
+        if self.next_run < today:
+            nxt = self.next_after(today)
+            if nxt:
+                self.next_run = nxt
+            changed = True
+        return changed
 
     def _monthly_date(self, year, month):
         """按月生成日期；day_of_month=31 视为月末，小月自动落到最后一天。"""
@@ -190,6 +218,7 @@ class RecurringRule(models.Model):
         """算出 base 之后（严格 > base）的下一次执行日期。
 
         间隔 > 1 时统一以 start_date 为基准网格推进，避免逐次累加导致漂移。
+        推不出来时返回 None（调用方必须判空，不要直接拿去比较）。
         """
         interval = max(int(self.interval or 1), 1)
         start = self.start_date
@@ -203,12 +232,13 @@ class RecurringRule(models.Model):
                 delta = (target - base.weekday()) % 7
                 return base + timedelta(days=delta or 7)
             k = (base - start).days // (7 * interval) + 1
-            while True:
+            for _ in range(MAX_PERIOD_STEPS):
                 anchor = start + timedelta(weeks=k * interval)
                 candidate = anchor + timedelta(days=(target - anchor.weekday()) % 7)
                 if candidate > base:
                     return candidate
                 k += 1
+            return None
 
         # 每月
         if interval == 1:
@@ -220,12 +250,13 @@ class RecurringRule(models.Model):
                 month, year = 1, year + 1
             return self._monthly_date(year, month)
         k = ((base.year - start.year) * 12 + (base.month - start.month)) // interval + 1
-        while True:
+        for _ in range(MAX_PERIOD_STEPS):
             total = (start.month - 1) + k * interval
             candidate = self._monthly_date(start.year + total // 12, total % 12 + 1)
             if candidate > base:
                 return candidate
             k += 1
+        return None
 
     def is_expired(self, today=None):
         return bool(self.end_date) and (today or timezone.now().date()) > self.end_date

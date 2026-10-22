@@ -1223,6 +1223,10 @@ class RecurringRuleViewSet(viewsets.ModelViewSet):
             rule.end_date = data['end_date']
         if 'is_active' in data:
             rule.is_active = bool(data['is_active'])
+            # 停用期间 next_run 会停在过去，直接置 True 等于「开着但永远不执行」，
+            # 启用时顺手把过期排期顺到下一周期点（无改动则 enable 返回 False）
+            if data['is_active']:
+                rule.enable()
         if 'is_private' in data:
             rule.is_private = bool(data['is_private']) and rule.type != 'income'
 
@@ -1248,6 +1252,8 @@ class RecurringRuleViewSet(viewsets.ModelViewSet):
         if reschedule:
             today = timezone.now().date()
             base = max(rule.start_date, today)
-            rule.next_run = rule.next_after(base) if rule.start_date <= today else rule.start_date
+            nxt = rule.next_after(base) if rule.start_date <= today else rule.start_date
+            if nxt:
+                rule.next_run = nxt
         rule.save()
         return api_response(rule_to_dict(rule), message='已更新规则')

@@ -4,8 +4,9 @@
 设计要点：
 1. 幂等 —— 规则执行后立即把 next_run 推进到下一次，
    所以同一天重复跑（定时任务补跑、手动触发）不会生成重复流水。
-2. 补跑有上限 —— 规则停用了很久再启用，最多补 MAX_CATCHUP 笔，
-   避免一次性灌进几百笔历史流水把统计冲垮。
+2. 不补历史 —— 错过的周期直接跳过（只记错过笔数，next_run 顺到下一周期点）。
+   房租、通勤这类固定收支补记到过去日期没有意义，反而会把当月收支统计冲高；
+   真要补，用页面的「立即执行」。
 3. 单笔失败不影响其它规则 —— 失败只记录 last_error，规则保持启用。
 """
 import logging
@@ -20,7 +21,9 @@ from domain.dedup import dedup_hash
 
 logger = logging.getLogger(__name__)
 
-# 单次运行最多补跑的笔数（防止长期停用的规则一次性补出大量流水）
+# 一次运行最多补跑的笔数。正常每日任务只会到期 1 笔；
+# 这是给「任务停了好几天（服务器宕机、qcluster 没起）」兜底的保护上限，
+# 超出的部分直接跳过，不往统计里灌历史流水。
 MAX_CATCHUP = 3
 
 
@@ -110,17 +113,38 @@ def execute_rule(rule, force=False, today=None):
         rule.save(update_fields=['is_active', 'updated_at'])
         return created
 
-    # 补跑：逐条推进，最多 MAX_CATCHUP 笔，剩下的顺延到今天之后
-    for _ in range(MAX_CATCHUP):
-        if rule.next_run > today:
+    # 到期的每一笔都补（正常每日任务只会有 1 笔）；超过 MAX_CATCHUP 的跳过不补。
+    # ★ 推排期前必须判空：next_after(月末) 的下一次可能落在下个月，
+    #   若该月没有对应日（如 day_of_month=30 遇到 2 月）→ next_run 会变 None，
+    #   再进 <= 比较就抛 TypeError，整条规则从此再也跑不起来。改为停用兜底。
+    skipped = 0
+    exhausted = False
+    while rule.next_run and rule.next_run <= today:
+        nxt = rule.next_after(rule.next_run)
+        if nxt is None:
+            exhausted = True
+            rule.is_active = False
+            logger.warning('周期记账 rule=%s 无法推到下一次执行日，已自动停用', rule.id)
             break
-        tx = _write_tx(rule, rule.next_run)
-        created.append(tx.id)
-        rule.run_count += 1
-        rule.next_run = rule.next_after(rule.next_run)
+        if len(created) >= MAX_CATCHUP:
+            skipped += 1
+        else:
+            tx = _write_tx(rule, rule.next_run)
+            created.append(tx.id)
+            rule.run_count += 1
+        rule.next_run = nxt
     rule.last_run_at = timezone.now()
     rule.last_error = ''
-    rule.save(update_fields=['next_run', 'run_count', 'last_run_at', 'last_error', 'updated_at'])
+    fields = ['run_count', 'last_run_at', 'last_error', 'updated_at']
+    if rule.next_run is None:
+        # next_run 是 NOT NULL，不能存 None：保持原值并停用
+        rule.is_active = False
+        fields += ['is_active']
+    else:
+        fields.append('next_run')
+    rule.save(update_fields=fields)
+    if skipped:
+        logger.warning('周期记账 rule=%s 错过周期过多，跳过 %d 笔未补', rule.id, skipped)
     return created
 
 

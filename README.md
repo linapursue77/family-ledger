@@ -49,6 +49,7 @@
 | 账单导入 | 微信账单、支付宝账单、自动解析与指纹去重、导入前预览确认 |
 | 账户资产 | 储蓄卡 / 信用卡 / 现金 / 数字钱包、余额手动调整（含审计说明）、计入总资产开关 |
 | 资产快照 | 每月余额快照、月变化对比、资产净值曲线 |
+| 定时记账 | 每天 / 每周 / 每月规则自动生成流水并入账，可停用、可立即执行、错过周期不补历史 |
 | 借钱来往 | 借出 / 借入、部分还款、约定还款日、台账状态（未还 / 部分还 / 已还清） |
 | 报告分析 | 月度收支、分类占比、趋势对比、结余与储蓄率 |
 | AI 智能分析 | 界面内配置服务商与 Key，即时生效，带缓存，无需重启 |
@@ -105,12 +106,33 @@ cp .env.example .env                 # Windows: copy .env.example .env
 python manage.py migrate
 python manage.py seed_categories
 
+# 注册定时任务（幂等，可反复执行；会自动修正错误的排期）
+python manage.py setup_schedules
+
 # 启动（默认 http://127.0.0.1:8001）
 python manage.py runserver 127.0.0.1:8001
+
+# ★ 另开一个终端，跑定时任务与异步任务（定时记账、每日资产快照、账单异步解析）
+#   runserver 不会触发任何定时任务，不起这个进程定时记账永远不会生效
+python manage.py qcluster
 ```
 
 > **开箱即用**：`.env` 里的 `DB_HOST` 保持为空即使用 SQLite，无需装 MySQL。
 > 想用 MySQL：填好 `DB_HOST` / `DB_USER` / `DB_PASSWORD`，并手动创建 `DB_NAME` 对应的空数据库（UTF-8）。
+
+> **定时记账不生效？** 先看 `qcluster` 是否在跑（`ps aux | grep qcluster`），再看排期是否正常：
+>
+> ```bash
+> python manage.py shell -c "from django_q.models import Schedule; from django.utils import timezone; [print(s.name, timezone.localtime(s.next_run)) for s in Schedule.objects.all()]"
+> ```
+>
+> 想立刻补跑一次到期规则，不依赖队列：
+>
+> ```bash
+> python manage.py run_recurring            # 只跑已到期的规则
+> python manage.py run_recurring --dry-run  # 看看哪些会跑
+> python manage.py run_recurring --force <规则ID>  # 强制立即记一笔
+> ```
 
 ### 3. 启动前端
 
