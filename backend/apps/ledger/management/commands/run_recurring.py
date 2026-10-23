@@ -32,7 +32,7 @@ class Command(BaseCommand):
             return
 
         if options['dry_run']:
-            rules = RecurringRule.objects.filter(is_active=True, next_run__lte=timezone.now().date())
+            rules = RecurringRule.objects.filter(is_active=True, next_run__lte=timezone.localdate())
             for r in rules:
                 self.stdout.write(f'待执行：{r.name} · {r.schedule_text()} · ¥{r.amount_cents / 100:.2f} · {r.next_run}')
             self.stdout.write(f'共 {len(rules)} 条')

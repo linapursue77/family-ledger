@@ -1186,7 +1186,8 @@ class RecurringRuleViewSet(viewsets.ModelViewSet):
             next_run=start,
         )
         # 开始日期已过 → 排期直接落到下一个周期点，避免建完立刻补一堆历史流水
-        today = timezone.now().date()
+        # ★ 用 localdate()：now().date() 在北京时间 08:00 前会返回 UTC 的昨天
+        today = timezone.localdate()
         if rule.next_run <= today:
             rule.next_run = rule.next_after(today)
         rule.save()
@@ -1250,7 +1251,7 @@ class RecurringRuleViewSet(viewsets.ModelViewSet):
         if 'start_date' in data:
             rule.start_date = data['start_date']
         if reschedule:
-            today = timezone.now().date()
+            today = timezone.localdate()
             base = max(rule.start_date, today)
             nxt = rule.next_after(base) if rule.start_date <= today else rule.start_date
             if nxt:

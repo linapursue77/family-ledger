@@ -53,6 +53,7 @@
 | 借钱来往 | 借出 / 借入、部分还款、约定还款日、台账状态（未还 / 部分还 / 已还清） |
 | 报告分析 | 月度收支、分类占比、趋势对比、结余与储蓄率 |
 | AI 智能分析 | 界面内配置服务商与 Key，即时生效，带缓存，无需重启 |
+| 管理后台 | 注册账号管理、用户与增长统计、会员开通/撤销、定时任务启停与立即执行 |
 | 微信小程序 | `miniprogram/` 提供首页 / 记账 / 导入 / 报告 / 我的 五个页面（骨架） |
 
 金额全部以**分（整数）**存储，杜绝浮点误差。
@@ -163,13 +164,39 @@ python manage.py seed_showcase          # 加 --reset 可清空重建
 ### 其他常用命令
 
 ```bash
-python manage.py createsuperuser          # 后台管理员 /admin/
+python manage.py createsuperuser          # Django Admin 管理员 /admin/
+python manage.py make_admin 13800138000   # 把已注册账号设为管理后台管理员
+python manage.py make_admin 13800138000 --revoke  # 撤销后台权限
 python manage.py qcluster                 # 异步任务（账单解析、每日快照）
 python manage.py setup_schedules          # 注册定时任务
 python manage.py snapshot_accounts        # 手动生成资产快照
 python manage.py seed_all                 # 组合种子数据
 python scripts/smoke.py                   # 接口冒烟测试
 ```
+
+---
+
+## 管理后台
+
+登录后从「我的 → 管理后台」进入（仅 `is_staff` 可见），地址是 `/#/console`。
+
+| 页面 | 能做什么 |
+| --- | --- |
+| 概览 | 注册用户数（今日/本周/本月）、家庭数、有效会员、记账流水、近 7 天活跃、定时任务状态、近 14 天趋势 |
+| 注册账号 | 按手机号/昵称搜索，按状态与会员身份筛选；查看用户详情（家庭、会员历史、最近流水、记账统计）；停用/启用账号；设为/撤销管理员 |
+| 会员 | 按天数或套餐手动开通（已有会员自动顺延）；查看全部订阅记录；撤销开通 |
+| 定时任务 | 查看每条任务的排期与上次执行结果；立即执行；启用/停用；查看所有用户的周期记账规则 |
+
+**开通管理员**：
+
+```bash
+cd backend
+python manage.py make_admin <已注册的手机号>
+```
+
+管理后台与家庭里的「主账号 / 子账号」无关 —— 前者是平台运维权限，后者是家庭内数据权限。
+
+两个后台的分工：`/#/console` 面向运营（统计、会员、任务），`/admin/` 是 Django 自带后台，用于兜底改模型明细。
 
 API 文档：`http://127.0.0.1:8001/api/docs/`（Swagger）
 

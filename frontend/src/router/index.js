@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { VIP_ENABLED } from '@/utils/flags'
+import { useAuthStore } from '@/stores/auth'
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('@/views/Login.vue'), meta: { tab: false } },
@@ -22,6 +23,30 @@ const routes = [
   { path: '/member', name: 'member', component: () => import('@/views/MemberCenter.vue') },
   // 邀请落地页：从分享链接进入，接受后才算加入家庭，因此不挂 TabBar
   { path: '/join', name: 'join', component: () => import('@/views/Join.vue'), meta: { tab: false } },
+  // 管理后台：宽屏布局、不挂 TabBar，仅 is_staff 可见
+  {
+    path: '/console',
+    component: () => import('@/views/console/ConsoleLayout.vue'),
+    meta: { tab: false, wide: true, admin: true },
+    children: [
+      { path: '', name: 'console', component: () => import('@/views/console/Dashboard.vue') },
+      {
+        path: 'users',
+        name: 'console-users',
+        component: () => import('@/views/console/Users.vue'),
+      },
+      {
+        path: 'members',
+        name: 'console-members',
+        component: () => import('@/views/console/Members.vue'),
+      },
+      {
+        path: 'tasks',
+        name: 'console-tasks',
+        component: () => import('@/views/console/Tasks.vue'),
+      },
+    ],
+  },
 ]
 
 const router = createRouter({
@@ -33,7 +58,7 @@ const router = createRouter({
   },
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   // 会员入口未开放：直接输 /#/member 也进不去，回到「我的」
   if (!VIP_ENABLED && to.name === 'member') {
     return { name: 'mine' }
@@ -44,6 +69,22 @@ router.beforeEach((to) => {
   }
   if (to.name === 'login' && token) {
     return { name: 'home' }
+  }
+
+  // 管理后台：只认 is_staff。刷新页面时 store 是空的，要先补一次 /auth/me，
+  // 否则合法管理员会被自己的守卫挡在门外。
+  if (to.meta.admin) {
+    const auth = useAuthStore()
+    if (!auth.user) {
+      try {
+        await auth.fetchMe()
+      } catch (e) {
+        return { name: 'login' }
+      }
+    }
+    if (!auth.user || !auth.user.is_staff) {
+      return { name: 'mine' }
+    }
   }
 })
 

@@ -286,4 +286,4 @@ class AdminConfigView(APIView):
         ser.is_valid(raise_exception=True)
         ser.save()
         return api_response(VipConfigSerializer(cfg).data, message='配置已保存',
-                            status_code=status.HTTP_200_OK)
+                            http_status=status.HTTP_200_OK)

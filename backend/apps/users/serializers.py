@@ -51,9 +51,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
+        # is_staff 决定「我的」页是否显示管理后台入口；只读，不可通过资料接口改
         fields = ['id', 'username', 'nickname', 'avatar_url', 'phone',
-                  'privacy_limit_cents', 'has_password']
-        read_only_fields = ['id', 'username', 'has_password']
+                  'privacy_limit_cents', 'has_password', 'is_staff']
+        read_only_fields = ['id', 'username', 'has_password', 'is_staff']
 
     def get_has_password(self, obj) -> bool:
         return obj.has_usable_password()

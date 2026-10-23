@@ -774,6 +774,15 @@ onMounted(() => {
           忘记密码的话，只能在服务器执行命令行重置。
         </div>
       </div>
+      <!-- 管理后台：只有 is_staff 可见，普通用户在页面上不会看到这一行 -->
+      <div v-if="auth.user?.is_staff" class="menu-item" @click="router.push('/console')">
+        <span class="menu-icon">🛠</span>
+        <span class="menu-main">
+          <span class="menu-text">管理后台</span>
+          <span class="menu-desc">账号 · 会员 · 定时任务</span>
+        </span>
+        <span class="menu-arrow">›</span>
+      </div>
       <div class="menu-item" @click="onLogout">
         <span class="menu-icon">🚪</span>
         <span class="menu-text text-expense">退出登录</span>

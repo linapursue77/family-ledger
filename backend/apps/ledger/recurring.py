@@ -90,7 +90,9 @@ def execute_rule(rule, force=False, today=None):
 
     返回本次生成的流水 id 列表。
     """
-    today = today or timezone.now().date()
+    # ★ 必须用 localdate()：定时任务排在本地 07:05，此时 UTC 还是前一天 23:05，
+    #   用 now().date() 会拿到「昨天」，导致今天到期的规则被判定为未到期而永远跳过。
+    today = today or timezone.localdate()
     created = []
 
     if force:
@@ -153,7 +155,8 @@ def run_due_rules(today=None):
 
     返回 {'scanned': 扫描到的规则数, 'created': 生成流水数, 'failed': 失败规则数}
     """
-    today = today or timezone.now().date()
+    # ★ localdate()：见 execute_rule 里同名说明，用 now().date() 会因 UTC 偏差漏跑当天。
+    today = today or timezone.localdate()
     qs = RecurringRule.objects.filter(is_active=True, next_run__lte=today)
     stats = {'scanned': 0, 'created': 0, 'failed': []}
     for rule in qs:

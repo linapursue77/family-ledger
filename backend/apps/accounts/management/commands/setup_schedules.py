@@ -76,9 +76,16 @@ class Command(BaseCommand):
             if obj.repeats == 0:
                 obj.repeats = -1
                 dirty.append('repeats')
-            # next_run 不合法（在很久以前 / 为空）→ 直接重排到下一个执行点。
-            # 允许 1 天冗余，避免每天启动都把排期往后推。
-            if not obj.next_run or obj.next_run < now - timedelta(days=1):
+            # next_run 不合法时重排到下一个执行点，判据有三条：
+            #   1. 为空
+            #   2. 本地时分与 RUN_AT 不符（曾被手动拨动 / 旧版本按建库时刻写入）
+            #   3. 已经过去（说明今天这一次没跑成）
+            # 都在「未来且时分正确」时不改动，保证幂等，不会每次启动都往后推。
+            nxt_ok = False
+            if obj.next_run:
+                lt = timezone.localtime(obj.next_run)
+                nxt_ok = (lt.hour, lt.minute) == RUN_AT and lt > now - timedelta(minutes=5)
+            if not nxt_ok:
                 obj.next_run = _next_local_run(now)
                 dirty.append('next_run')
             if dirty:

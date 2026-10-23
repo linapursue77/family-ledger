@@ -183,3 +183,24 @@ export const importApi = {
   confirm: (id, payload) => unwrap(client.post(`/ledger/imports/${id}/confirm/`, payload)),
   remove: (id) => unwrap(client.delete(`/ledger/imports/${id}/`)),
 }
+
+// 管理后台：全部接口要求 is_staff，非管理员访问会被后端 403
+export const consoleApi = {
+  overview: () => unwrap(client.get('/console/overview/')),
+  // 账号
+  users: (params) => unwrap(client.get('/console/users/', { params })),
+  user: (id) => unwrap(client.get(`/console/users/${id}/`)),
+  updateUser: (id, payload) => unwrap(client.patch(`/console/users/${id}/`, payload)),
+  // 会员
+  plans: () => unwrap(client.get('/console/plans/')),
+  subscriptions: (params) => unwrap(client.get('/console/subscriptions/', { params })),
+  grantVip: (payload) => unwrap(client.post('/console/subscriptions/', payload)),
+  revokeVip: (id) => unwrap(client.delete(`/console/subscriptions/${id}/`)),
+  // 定时任务
+  schedules: () => unwrap(client.get('/console/schedules/')),
+  runSchedule: (id) => unwrap(client.post(`/console/schedules/${id}/run/`, {})),
+  toggleSchedule: (id, enabled) =>
+    unwrap(client.patch(`/console/schedules/${id}/`, { enabled })),
+  // 周期记账规则
+  recurring: () => unwrap(client.get('/console/recurring/')),
+}

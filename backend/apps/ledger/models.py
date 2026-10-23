@@ -195,7 +195,7 @@ class RecurringRule(models.Model):
           所以启用时把早于今天的排期顺到下一个周期点。
           返回是否有改动，供调用方决定要不要落库。
         """
-        today = today or timezone.now().date()
+        today = today or timezone.localdate()
         changed = False
         if not self.is_active:
             self.is_active = True
@@ -259,7 +259,7 @@ class RecurringRule(models.Model):
         return None
 
     def is_expired(self, today=None):
-        return bool(self.end_date) and (today or timezone.now().date()) > self.end_date
+        return bool(self.end_date) and (today or timezone.localdate()) > self.end_date
 
 
 class AISettings(models.Model):

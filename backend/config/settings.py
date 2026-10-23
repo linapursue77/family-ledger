@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'apps.ledger',
     'apps.loans',
     'apps.membership',
+    # 管理后台接口（仅 is_staff）
+    'apps.console',
 ]
 
 MIDDLEWARE = [
@@ -103,6 +105,16 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                # SQLite 同一时刻只允许一个写者。qcluster 的 worker 与 web 进程
+                # 并发写时会直接抛 "database is locked"，定时任务因此失败。
+                #   timeout          —— 抢不到锁时等待而不是立刻报错
+                #   WAL              —— 读写不互相阻塞，大幅减少锁冲突
+                #   IMMEDIATE 事务   —— 一开始就拿写锁，避免「读事务升级写事务」死等
+                'timeout': 30,
+                'init_command': 'PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;',
+                'transaction_mode': 'IMMEDIATE',
+            },
         }
     }
 
@@ -187,7 +199,9 @@ else:
 # ---------------------------------------------------------------- Django-Q2 任务队列
 Q_CLUSTER = {
     'name': 'family-ledger',
-    'workers': int(os.environ.get('Q_WORKERS', '2')),
+    # SQLite 只支持单写者，多 worker 并发写必然撞锁 —— 本地默认 1 个 worker 串行跑；
+    # 生产（MySQL）默认 2 个，也可用 Q_WORKERS 覆盖。
+    'workers': int(os.environ.get('Q_WORKERS', '1' if not _DB_HOST else '2')),
     'timeout': 300,
     'retry': 600,
     'queue_limit': 50,

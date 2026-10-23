@@ -15,7 +15,10 @@ venv/
 # ---- 本项目运行时产物 ----
 backend/logs/
 backend/media/
+# SQLite 数据库本体，以及开启 WAL 后产生的 -wal / -shm 旁路文件
 backend/db.sqlite3
+backend/db.sqlite3-wal
+backend/db.sqlite3-shm
 *.log
 *.log.*
 
