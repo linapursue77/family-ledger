@@ -1,6 +1,7 @@
 const api = require('../../utils/api')
 const { yuan } = require('../../utils/money')
 const { requireLogin } = require('../../utils/request')
+const { appPayload, toAppMessage, toTimeline } = require('../../utils/share')
 
 const PRESETS = [
   { key: 'last_week', label: '近1周' },
@@ -496,5 +497,13 @@ Page({
 
   goReturns() {
     wx.navigateTo({ url: '/pages/returns/returns' })
+  },
+
+  // 右上角转发：没有这个钩子时微信会截当前页面，首页数据多时容易截成空白
+  onShareAppMessage() {
+    return toAppMessage(appPayload())
+  },
+  onShareTimeline() {
+    return toTimeline(appPayload())
   },
 })

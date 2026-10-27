@@ -1,6 +1,7 @@
 const api = require('../../utils/api')
 const { yuan } = require('../../utils/money')
 const { requireLogin } = require('../../utils/request')
+const { appPayload, toAppMessage, toTimeline } = require('../../utils/share')
 
 // 周期与 H5 Report.vue 完全一致
 const PRESETS = [
@@ -447,5 +448,13 @@ Page({
           })
         })
       })
+  },
+
+  // 报表页也挂一份：否则右上角转发会截这张长页面，卡片出来经常是空白
+  onShareAppMessage() {
+    return toAppMessage(appPayload())
+  },
+  onShareTimeline() {
+    return toTimeline(appPayload())
   },
 })
