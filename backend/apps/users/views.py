@@ -200,6 +200,63 @@ class ProfileUpdateView(APIView):
         return api_response(UserSerializer(request.user).data, message='已更新')
 
 
+class BindPhoneView(APIView):
+    """把手机号绑到当前账号，打通「小程序微信登录」与「H5 手机号密码登录」。
+
+    个人主体用不了微信手机号快捷验证，所以这里走手动填写、不验证归属：
+    - 手机号未被占用 → 直接绑上；
+    - 已被占用 → 拒绝，引导用户改用手机号登录后再绑微信。
+      不做自动合并：合并要迁家庭、流水、账户归属，风险和收益不成正比。
+
+    可以顺带设置密码（微信注册的账号默认没有可用密码，单独再设一次很别扭）。
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    class _InlineSerializer(serializers.Serializer):
+        phone = serializers.RegexField(PHONE_RE, error_messages={'invalid': '请输入正确的手机号'})
+        password = serializers.CharField(required=False, allow_blank=True,
+                                         min_length=6, max_length=32)
+
+    def post(self, request):
+        ser = self._InlineSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        phone = ser.validated_data['phone']
+        user = request.user
+
+        taken = (User.objects.filter(phone=phone).exclude(pk=user.pk).exists()
+                 or User.objects.filter(username=phone).exclude(pk=user.pk).exists())
+        if taken:
+            raise BusinessError(
+                '该手机号已被其他账号使用。请直接用「手机号 + 密码」登录，'
+                '登录后在「我的」里绑定微信', code=4009)
+
+        fields = []
+        if user.phone != phone:
+            user.phone = phone
+            fields.append('phone')
+        # ★ username 必须同步改成手机号：LoginView 走 authenticate(username=phone)，
+        #   微信账号的 username 是 wx_xxx，只改 phone 字段的话绑完照样登不进去。
+        if user.username != phone:
+            user.username = phone
+            fields.append('username')
+
+        pwd = (ser.validated_data.get('password') or '').strip()
+        if pwd and not user.has_usable_password():
+            user.set_password(pwd)
+            fields.append('password')
+
+        if fields:
+            user.save(update_fields=fields)
+
+        if user.has_usable_password():
+            message = '手机号已绑定，可以用它登录网页版了'
+        else:
+            message = '手机号已绑定，再设置一个密码就能在网页版登录'
+        logger.info('账号绑定手机号 user=%s fields=%s', user.id, fields)
+        return api_response(_me_payload(user), message=message)
+
+
 # --------------------------------------------------------------------------- 微信身份
 def _bind_openid(user: User, openid: str) -> bool:
     """把 openid 绑到当前账号；已被别人占用时不覆盖，也不让授权流程中断。"""
@@ -325,7 +382,14 @@ class WechatOpenidView(APIView):
             raise BusinessError('微信登录失败，请重试')
         if not openid:
             raise BusinessError('未取到微信身份，请重试')
-        _bind_openid(request.user, openid)
+
+        bound = _bind_openid(request.user, openid)
+        if not bound:
+            # 已经绑的就是这个微信 → 幂等成功；否则是被别的账号占用
+            request.user.refresh_from_db(fields=['openid'])
+            if request.user.openid != openid:
+                raise BusinessError('这个微信已经绑定了其他账号，请直接用微信登录那个账号',
+                                    code=4010)
         return api_response({'openid_bound': True}, message='已绑定微信')
 
 

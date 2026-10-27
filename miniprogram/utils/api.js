@@ -8,6 +8,10 @@ module.exports = {
   me: () => request('GET', '/auth/me/'),
   // 设置 / 修改登录密码：无密码（纯微信登录）时不用传 old_password
   updatePassword: (data) => request('POST', '/auth/password/', data),
+  // 账号打通：给微信账号补手机号（可顺带设密码），之后 H5 也能登录
+  bindPhone: (data) => request('POST', '/auth/bind-phone/', data),
+  // 账号打通：把当前微信绑到已登录账号（手机号注册的老用户走这条）
+  bindWechat: (data) => request('POST', '/auth/wechat/openid/', data),
   // 改个人资料：「我的」页的隐私额度走这里，只传 privacy_limit_cents
   updateProfile: (data) => request('PATCH', '/auth/profile/', data),
 

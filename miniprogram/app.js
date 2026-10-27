@@ -9,12 +9,13 @@
 // 备案没下来 prod 一律请求失败。
 const ENV = {
   dev: 'http://127.0.0.1:8001/api/v1',
-  lan: 'http://192.168.1.100:8001/api/v1',
+  lan: 'http://192.168.17.129:8001/api/v1',
   prod: 'https://www.qianlaiqianwang.com.cn/api/v1',
 }
 
 // 开发默认 dev；真机调试改 lan；发布前改 prod
-const ENV_MODE = 'dev'
+// ★ 域名已备案 + HTTPS 证书就位，这里切到线上；本地调试时临时改回 dev/lan 即可
+const ENV_MODE = 'prod'
 
 App({
   globalData: {

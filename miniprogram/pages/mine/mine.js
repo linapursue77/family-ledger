@@ -8,6 +8,12 @@ const PRIVACY_MIN = 100
 const PRIVACY_MAX = 5000
 const PRIVACY_PRESETS = [300, 500, 1000, 2000, 5000]
 
+/** 手机号打码：138****8000，既能让用户认出是自己的号，又不整屏暴露 */
+function maskPhone(p) {
+  const s = String(p || '')
+  return s.length === 11 ? `${s.slice(0, 3)}****${s.slice(7)}` : s
+}
+
 Page({
   data: {
     user: null,
@@ -71,6 +77,15 @@ Page({
     hasPassword: false,
     pwdTitle: '设置密码',
     pwdText: '未设置',
+
+    // 账号打通：手机号（H5 登录用）与微信（小程序登录用）
+    showBindPhone: false,
+    bindPhone: '',
+    bindPwd: '',
+    bindSaving: false,
+    bindErr: '',
+    hasWechat: false,
+    phoneText: '未绑定',
   },
 
   onShow() {
@@ -112,6 +127,8 @@ Page({
         hasPassword: hasPwd,
         pwdTitle: hasPwd ? '修改密码' : '设置密码',
         pwdText: hasPwd ? '已设置' : '未设置',
+        hasWechat: !!me.user.has_wechat,
+        phoneText: me.user.phone ? maskPhone(me.user.phone) : '未绑定',
         myAssets: yuan(assets).toFixed(2),
         monthExpense: ov ? yuan(ov.expense_cents).toFixed(2) : '0.00',
         monthBalance: ov ? yuan(ov.balance_cents).toFixed(2) : '0.00',
@@ -330,6 +347,89 @@ Page({
       wx.showToast({ title: e.message || '保存失败', icon: 'none' })
     } finally {
       this.setData({ pwdSaving: false })
+    }
+  },
+
+  // ---------------------------------------------------------------- 账号打通
+  /**
+   * H5 与小程序共用一张 User 表，但身份标识不同：
+   *   小程序 → openid；H5 → 手机号 + 密码。
+   * 所以两边各补一把钥匙，账号才算真正打通。
+   */
+  openBindPhone() {
+    if (!this.data.isLoggedIn) return
+    if (this.data.user && this.data.user.phone) {
+      wx.showToast({ title: '手机号已绑定', icon: 'none' })
+      return
+    }
+    this.setData({ showBindPhone: !this.data.showBindPhone, bindErr: '' })
+  },
+
+  onBindPhoneInput(e) {
+    this.setData({ bindPhone: e.detail.value, bindErr: '' })
+  },
+
+  onBindPwdInput(e) {
+    this.setData({ bindPwd: e.detail.value, bindErr: '' })
+  },
+
+  async onSaveBindPhone() {
+    const phone = (this.data.bindPhone || '').trim()
+    const pwd = (this.data.bindPwd || '').trim()
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      this.setData({ bindErr: '请输入正确的手机号' })
+      return
+    }
+    // 密码不是必填：已经有密码的老用户只补手机号即可
+    if (pwd && !/^(?=.*[a-zA-Z])(?=.*\d).{6,}$/.test(pwd)) {
+      this.setData({ bindErr: '密码需字母+数字，至少 6 位' })
+      return
+    }
+    this.setData({ bindSaving: true, bindErr: '' })
+    try {
+      const res = await api.bindPhone({ phone, password: pwd })
+      const u = (res && res.user) || {}
+      wx.showToast({ title: '绑定成功', icon: 'success' })
+      this.setData({
+        showBindPhone: false,
+        bindPhone: '',
+        bindPwd: '',
+        user: Object.assign({}, this.data.user || {}, u),
+        phoneText: maskPhone(phone),
+        hasPassword: !!u.has_password,
+        pwdTitle: u.has_password ? '修改密码' : '设置密码',
+        pwdText: u.has_password ? '已设置' : '未设置',
+      })
+    } catch (e) {
+      this.setData({ bindErr: e.message || '绑定失败' })
+    } finally {
+      this.setData({ bindSaving: false })
+    }
+  },
+
+  /** 把当前微信绑到已登录账号（手机号注册的老用户走这条） */
+  async onBindWechat() {
+    if (!this.data.isLoggedIn) return
+    if (this.data.hasWechat) {
+      wx.showToast({ title: '已绑定微信', icon: 'none' })
+      return
+    }
+    wx.showLoading({ title: '绑定中…', mask: true })
+    try {
+      const code = await new Promise((resolve, reject) => {
+        wx.login({
+          timeout: 8000,
+          success: (r) => (r.code ? resolve(r.code) : reject(new Error('微信登录失败'))),
+          fail: () => reject(new Error('微信登录失败')),
+        })
+      })
+      await api.bindWechat({ code })
+      wx.hideLoading()
+      wx.showToast({ title: '已绑定微信', icon: 'success' })
+      this.setData({ hasWechat: true })
+    } catch (e) {
+      wx.hideLoading()
+      wx.showToast({ title: e.message || '绑定失败', icon: 'none' })
     }
   },
 

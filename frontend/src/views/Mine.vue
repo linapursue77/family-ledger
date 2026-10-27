@@ -12,6 +12,7 @@ import {
   recurringApi,
 } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { toast } from '@/utils/toast'
 import { VIP_ENABLED } from '@/utils/flags'
 import { yuan } from '@/utils/money'
 import { appSharePayload, share } from '@/utils/share'
@@ -394,6 +395,22 @@ const hasPassword = computed(() => auth.user?.has_password !== false)
 const pwdTitle = computed(() => (hasPassword.value ? '修改密码' : '设置密码'))
 const pwdText = computed(() => (hasPassword.value ? '已设置' : '未设置'))
 
+// —— 账号打通：H5 与小程序共用一张 User 表，这里只读展示两把「钥匙」的绑定状态 ——
+// H5 拿不到 wx.login，所以微信绑定只能在小程序里完成，这里只做引导。
+const hasWechat = computed(() => !!auth.user?.has_wechat)
+const maskedPhone = computed(() => {
+  const p = String(auth.user?.phone || '')
+  return p.length === 11 ? `${p.slice(0, 3)}****${p.slice(7)}` : p || '未绑定'
+})
+
+function onWechatBindTip() {
+  if (hasWechat.value) {
+    toast('已绑定微信，可在小程序用微信一键登录')
+    return
+  }
+  toast('微信绑定要在小程序里完成：「我的 → 绑定微信」')
+}
+
 function openPwd() {
   pwdForm.old_password = ''
   pwdForm.new_password = ''
@@ -744,6 +761,23 @@ onMounted(() => {
           现在能拿到的提醒是记账后的即时提示：超过「事后知会」提示你知会对方，超过「事前申请」提示需对方确认。
         </div>
       </div>
+      <!-- 账号打通：H5 用手机号、小程序用微信，两把钥匙绑在同一账号上才算打通 -->
+      <div class="menu-item">
+        <span class="menu-icon">📱</span>
+        <span class="menu-main">
+          <span class="menu-text">手机号</span>
+          <span class="menu-desc">网页版登录账号</span>
+        </span>
+        <span class="menu-value">{{ maskedPhone }}</span>
+      </div>
+      <div class="menu-item" @click="onWechatBindTip">
+        <span class="menu-icon">💬</span>
+        <span class="menu-main">
+          <span class="menu-text">微信</span>
+          <span class="menu-desc">{{ hasWechat ? '已绑定，可微信一键登录' : '去小程序「我的」绑定' }}</span>
+        </span>
+        <span class="menu-value">{{ hasWechat ? '已绑定' : '未绑定' }}</span>
+      </div>
       <div class="menu-item" @click="openPwd">
         <span class="menu-icon">🔑</span>
         <span class="menu-text">{{ pwdTitle }}</span>
@@ -770,8 +804,8 @@ onMounted(() => {
           </button>
         </div>
         <div class="ai-note">
-          用微信一键登录的账号默认没有密码，设置后即可用「手机号 + 密码」在网页版登录。
-          忘记密码的话，只能在服务器执行命令行重置。
+          密码用于「手机号 + 密码」登录。若你是在小程序用微信注册的，还需要先在小程序里绑定手机号，
+          否则网页版认不出这个账号。忘记密码只能在服务器执行命令行重置。
         </div>
       </div>
       <!-- 管理后台：只有 is_staff 可见，普通用户在页面上不会看到这一行 -->

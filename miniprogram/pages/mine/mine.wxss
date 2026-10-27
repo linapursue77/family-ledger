@@ -255,6 +255,13 @@
   color: var(--text-muted);
   line-height: 1.6;
 }
+/* 绑定手机号这类表单的行内错误提示，比 toast 更耐看（toast 一闪就没） */
+.form-err {
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  color: var(--expense);
+  line-height: 1.5;
+}
 .sub-form .btn-primary {
   margin-top: 20rpx;
 }

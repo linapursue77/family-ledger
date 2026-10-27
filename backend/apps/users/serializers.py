@@ -45,19 +45,35 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """用户资料。has_password 决定「我的」页显示「设置密码」还是「修改密码」。"""
+    """用户资料。has_password 决定「我的」页显示「设置密码」还是「修改密码」。
+
+    has_wechat / has_phone 用来在两端展示「账号是否已打通」：
+    微信注册的账号只有 openid，绑了手机号之后才能在 H5 用密码登录。
+    """
 
     has_password = serializers.SerializerMethodField()
+    has_wechat = serializers.SerializerMethodField()
+    has_phone = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         # is_staff 决定「我的」页是否显示管理后台入口；只读，不可通过资料接口改
+        # phone 只读：绑定手机号必须走 /auth/bind-phone/，那里才有唯一性校验，
+        # 直接 PATCH 资料会把别人的号抢过来、也不会同步 username。
         fields = ['id', 'username', 'nickname', 'avatar_url', 'phone',
-                  'privacy_limit_cents', 'has_password', 'is_staff']
-        read_only_fields = ['id', 'username', 'has_password', 'is_staff']
+                  'privacy_limit_cents', 'has_password', 'has_wechat', 'has_phone',
+                  'is_staff']
+        read_only_fields = ['id', 'username', 'phone', 'has_password', 'has_wechat',
+                            'has_phone', 'is_staff']
 
     def get_has_password(self, obj) -> bool:
         return obj.has_usable_password()
+
+    def get_has_wechat(self, obj) -> bool:
+        return bool(obj.openid)
+
+    def get_has_phone(self, obj) -> bool:
+        return bool(obj.phone)
 
 
 class SmsSendSerializer(serializers.Serializer):
