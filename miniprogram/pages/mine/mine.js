@@ -86,13 +86,6 @@ Page({
     bindErr: '',
     hasWechat: false,
     phoneText: '未绑定',
-
-    // 误注册空账号的补救：关联到网页版已注册的账号
-    showLink: false,
-    linkPhone: '',
-    linkPwd: '',
-    linkSaving: false,
-    linkErr: '',
   },
 
   onShow() {
@@ -390,6 +383,18 @@ Page({
     this.setData({ bindSaving: true, bindErr: '' })
     try {
       const res = await api.bindPhone({ phone, password: pwd })
+
+      // 手机号在网页版注册过时，后端会把微信身份迁过去并重签 token。
+      // 这时必须先换 storage 里的 token，否则后续请求还是空账号的身份。
+      if (res && res.token) {
+        wx.setStorageSync('fl_token', res.token.access)
+        if (res.token.refresh) wx.setStorageSync('fl_refresh', res.token.refresh)
+        wx.showToast({ title: '已关联原账号', icon: 'success' })
+        this.setData({ showBindPhone: false, bindPhone: '', bindPwd: '' })
+        await this.load()
+        return
+      }
+
       const u = (res && res.user) || {}
       wx.showToast({ title: '绑定成功', icon: 'success' })
       this.setData({
@@ -406,51 +411,6 @@ Page({
       this.setData({ bindErr: e.message || '绑定失败' })
     } finally {
       this.setData({ bindSaving: false })
-    }
-  },
-
-  /**
-   * 误注册空账号的补救：把当前微信身份迁到网页版已注册的账号上。
-   * 迁移后 token 必须换成目标账号的，否则后续请求还是旧身份。
-   */
-  openLinkAccount() {
-    if (!this.data.isLoggedIn) return
-    this.setData({ showLink: !this.data.showLink, linkErr: '' })
-  },
-
-  onLinkPhone(e) {
-    this.setData({ linkPhone: e.detail.value, linkErr: '' })
-  },
-
-  onLinkPwd(e) {
-    this.setData({ linkPwd: e.detail.value, linkErr: '' })
-  },
-
-  async onSaveLinkAccount() {
-    const phone = (this.data.linkPhone || '').trim()
-    const pwd = this.data.linkPwd || ''
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      this.setData({ linkErr: '请输入正确的手机号' })
-      return
-    }
-    if (!pwd) {
-      this.setData({ linkErr: '请输入网页版账号的密码' })
-      return
-    }
-    this.setData({ linkSaving: true, linkErr: '' })
-    try {
-      const res = await api.linkAccount({ phone, password: pwd })
-      if (res && res.token) {
-        wx.setStorageSync('fl_token', res.token.access)
-        if (res.token.refresh) wx.setStorageSync('fl_refresh', res.token.refresh)
-      }
-      wx.showToast({ title: '已关联原账号', icon: 'success' })
-      this.setData({ showLink: false, linkPhone: '', linkPwd: '' })
-      await this.load()
-    } catch (e) {
-      this.setData({ linkErr: e.message || '关联失败' })
-    } finally {
-      this.setData({ linkSaving: false })
     }
   },
 

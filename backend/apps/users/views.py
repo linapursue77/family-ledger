@@ -7,8 +7,10 @@ from urllib.parse import quote, urlparse
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.db import transaction
+from django.contrib.auth.password_validation import validate_password
 from django.core import signing
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -202,36 +204,92 @@ class ProfileUpdateView(APIView):
         return api_response(UserSerializer(request.user).data, message='已更新')
 
 
+def _migrate_wechat_identity(current: User, target: User) -> None:
+    """把 current 的微信身份迁到 target，并停用 current 这个空壳账号。
+
+    两步必须在同一事务里：先解绑再绑定，否则中间态会出现两个账号抢同一个 openid。
+    """
+    openid = current.openid
+    with transaction.atomic():
+        current.openid = ''
+        current.is_active = False
+        current.save(update_fields=['openid', 'is_active'])
+        target.openid = openid
+        target.save(update_fields=['openid'])
+
+
+def _switch_to_account(target: User, message: str):
+    """迁移完成后返回新账号的完整资料 + 重签的 token。
+
+    ★ token 必须换：旧 token 里带的是空壳账号的 user_id，
+      不换的话前端拿着旧 token 继续请求，看到的还是空账号。
+    """
+    refresh = RefreshToken.for_user(target)
+    data = _me_payload(target)
+    data['token'] = {'refresh': str(refresh), 'access': str(refresh.access_token)}
+    return api_response(data, message=message)
+
+
 class BindPhoneView(APIView):
     """把手机号绑到当前账号，打通「小程序微信登录」与「H5 手机号密码登录」。
 
-    个人主体用不了微信手机号快捷验证，所以这里走手动填写、不验证归属：
-    - 手机号未被占用 → 直接绑上；
-    - 已被占用 → 拒绝，引导用户改用手机号登录后再绑微信。
-      不做自动合并：合并要迁家庭、流水、账户归属，风险和收益不成正比。
+    个人主体用不了微信手机号快捷验证，所以这里走手动填写。两条分支：
+    - 手机号没被用过 → 直接绑上（同时可设密码）；
+    - 手机号在网页版注册过 → 要求输入那个账号的密码，验证通过后把微信身份
+      迁过去、直接切到原账号，用户就能看到自己的账本和流水。
 
-    可以顺带设置密码（微信注册的账号默认没有可用密码，单独再设一次很别扭）。
+    ★ 为什么一定要密码：不校验就能「输入谁手机号进谁家账本」，
+      等于任何人对任何账号都能越权接管。密码是这条路上唯一的门槛。
     """
 
     permission_classes = [IsAuthenticated]
 
     class _InlineSerializer(serializers.Serializer):
         phone = serializers.RegexField(PHONE_RE, error_messages={'invalid': '请输入正确的手机号'})
-        password = serializers.CharField(required=False, allow_blank=True,
-                                         min_length=6, max_length=32)
+        password = serializers.CharField(required=False, allow_blank=True, max_length=32)
 
     def post(self, request):
         ser = self._InlineSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         phone = ser.validated_data['phone']
+        pwd = (ser.validated_data.get('password') or '').strip()
         user = request.user
 
-        taken = (User.objects.filter(phone=phone).exclude(pk=user.pk).exists()
-                 or User.objects.filter(username=phone).exclude(pk=user.pk).exists())
-        if taken:
-            raise BusinessError(
-                '该手机号已被其他账号使用。请直接用「手机号 + 密码」登录，'
-                '登录后在「我的」里绑定微信', code=4009)
+        taken = (User.objects.filter(phone=phone).exclude(pk=user.pk).first()
+                 or User.objects.filter(username=phone).exclude(pk=user.pk).first())
+
+        # ---------------------------------------------------------- 已有账号：迁过去
+        if taken is not None:
+            if not user.openid:
+                raise BusinessError('当前账号没有微信身份，无法关联')
+            if not pwd:
+                raise BusinessError('该手机号已在网页版注册，请输入它的密码来关联', code=4009)
+
+            target = authenticate(request, username=phone, password=pwd)
+            if target is None:
+                raise BusinessError('该手机号已有账号，但密码不正确', code=4009)
+            if target.pk == user.pk:
+                raise BusinessError('这就是当前账号，无需关联')
+            if target.openid:
+                raise BusinessError('该手机号账号已经绑定了其他微信')
+
+            member = FamilyMember.objects.filter(user=user).first()
+            if member and not _is_empty_self_family(member):
+                raise BusinessError('当前账号已经有记账数据，无法直接关联。'
+                                    '如果需要合并，请联系管理员')
+
+            _migrate_wechat_identity(user, target)
+            logger.info('绑定手机号时合并账号 current=%s → target=%s', user.id, target.id)
+            return _switch_to_account(target, '已关联到该手机号的原账号，账本和流水都在')
+
+        # ---------------------------------------------------------- 新手机号：正常绑定
+        # 先校验密码，再改字段：校验失败时不应留下「phone 已改、密码没设」的半成品对象
+        if pwd:
+            # 复用 settings.AUTH_PASSWORD_VALIDATORS 的规则，和注册 / 改密码保持一致
+            try:
+                validate_password(pwd, user)
+            except ValidationError as exc:
+                raise BusinessError('；'.join(exc.messages))
 
         fields = []
         if user.phone != phone:
@@ -243,8 +301,7 @@ class BindPhoneView(APIView):
             user.username = phone
             fields.append('username')
 
-        pwd = (ser.validated_data.get('password') or '').strip()
-        if pwd and not user.has_usable_password():
+        if pwd:
             user.set_password(pwd)
             fields.append('password')
 
@@ -402,19 +459,9 @@ class LinkAccountView(APIView):
             raise BusinessError('当前账号已经有记账数据，无法直接关联。'
                                 '如果需要合并，请联系管理员')
 
-        with transaction.atomic():
-            # 先解开当前微信身份，再绑到目标账号，避免中间态两边都占用同一个 openid
-            current.openid = ''
-            current.is_active = False   # 空壳账号停用，不留可登录的废号
-            current.save(update_fields=['openid', 'is_active'])
-            target.openid = openid
-            target.save(update_fields=['openid'])
-
-        refresh = RefreshToken.for_user(target)
+        _migrate_wechat_identity(current, target)
         logger.info('账号关联：current=%s → target=%s', current.id, target.id)
-        data = _me_payload(target)
-        data['token'] = {'refresh': str(refresh), 'access': str(refresh.access_token)}
-        return api_response(data, message='已关联到原账号，账本和流水都在')
+        return _switch_to_account(target, '已关联到原账号，账本和流水都在')
 
 
 class WechatOpenidView(APIView):
