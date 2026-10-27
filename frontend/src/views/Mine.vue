@@ -420,10 +420,6 @@ function openPwd() {
 }
 
 async function savePwd() {
-  if (hasPassword.value && !pwdForm.old_password) {
-    pwdMsg.value = '请先填写当前密码'
-    return
-  }
   // 密码规则：字母+数字，不低于 6 位（与后端 validators.LetterAndDigitValidator 一致）
   if (!/^(?=.*[a-zA-Z])(?=.*\d).{6,}$/.test(pwdForm.new_password)) {
     pwdMsg.value = '密码需同时包含字母和数字，且不低于 6 位'
@@ -437,7 +433,6 @@ async function savePwd() {
   pwdMsg.value = ''
   try {
     await authApi.updatePassword({
-      old_password: pwdForm.old_password,
       new_password: pwdForm.new_password,
       confirm_password: pwdForm.confirm_password,
     })
@@ -785,10 +780,7 @@ onMounted(() => {
         <span class="menu-arrow">{{ showPwdForm ? '⌃' : '›' }}</span>
       </div>
       <div v-if="showPwdForm" class="ai-form">
-        <div v-if="hasPassword" class="ai-field">
-          <label>当前密码</label>
-          <input v-model="pwdForm.old_password" type="password" placeholder="请输入当前密码" />
-        </div>
+        <!-- 已登录状态直接改密码，不再要求输入原密码：少一步，也免得用户忘了旧密码就卡住 -->
         <div class="ai-field">
           <label>新密码</label>
           <input v-model="pwdForm.new_password" type="password" placeholder="字母+数字，至少 6 位" />

@@ -5,7 +5,9 @@ Page({
     phone: '13800138000',
     password: 'test123456',
     loading: false,
-    showPwd: false,
+    // 默认展开手机号登录：老用户（网页版注册过）最容易误点「微信一键登录」，
+    // 一误点就会建出一个空账号，看不到自己的账本。把密码登录摆在明面上更稳。
+    showPwd: true,
   },
 
   onPhone(e) {

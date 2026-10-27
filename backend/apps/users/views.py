@@ -6,6 +6,7 @@ from urllib.parse import quote, urlparse
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.db import transaction
 from django.core import signing
 from django.core.cache import cache
 from django.http import HttpResponseBadRequest
@@ -20,7 +21,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.accounts.views import book_labels
 from apps.core.response import BusinessError, api_response
 from apps.families.models import Family, FamilyMember, Threshold
-from apps.families.services import get_invitation, join_family_by_invitation
+from apps.families.services import (_is_empty_self_family, get_invitation,
+                                    join_family_by_invitation)
 from apps.membership import pay as wxpay
 from apps.users import sms_services
 from apps.users.models import SmsCode, User
@@ -360,6 +362,59 @@ def _login_by_openid(openid: str, nickname: str = '', avatar_url: str = '',
         'phone_bound': bool(user.phone),
         'phone_error': phone_error,
     }
+
+
+class LinkAccountView(APIView):
+    """把当前微信身份关联到已有的手机号账号（先注册 H5、后打开小程序的用户）。
+
+    场景：用户先在网页版用手机号注册，之后打开小程序点了「微信一键登录」。
+    微信只能给出 openid，认不出「这个微信是哪个手机号的人」（个人主体拿不到
+    手机号快捷验证），于是又建了一个空账号。这里让他在已登录状态下输入
+    手机号 + 密码，把 openid 迁到老账号，并重签 token 直接切过去。
+
+    只允许在「当前账号没有任何数据」时迁移：已经记过账说明有家庭、账户、流水，
+    硬合并要处理归属关系，风险和收益不成正比。
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        phone = str(request.data.get('phone') or '').strip()
+        password = str(request.data.get('password') or '')
+        if not PHONE_RE.match(phone) or not password:
+            raise BusinessError('请输入手机号和密码')
+
+        current = request.user
+        openid = current.openid
+        if not openid:
+            raise BusinessError('当前账号没有微信身份，无需关联')
+
+        target = authenticate(request, username=phone, password=password)
+        if target is None:
+            raise BusinessError('手机号或密码不正确')
+        if target.pk == current.pk:
+            raise BusinessError('这就是当前账号，无需关联')
+        if target.openid:
+            raise BusinessError('该手机号账号已经绑定了其他微信')
+
+        member = FamilyMember.objects.filter(user=current).first()
+        if member and not _is_empty_self_family(member):
+            raise BusinessError('当前账号已经有记账数据，无法直接关联。'
+                                '如果需要合并，请联系管理员')
+
+        with transaction.atomic():
+            # 先解开当前微信身份，再绑到目标账号，避免中间态两边都占用同一个 openid
+            current.openid = ''
+            current.is_active = False   # 空壳账号停用，不留可登录的废号
+            current.save(update_fields=['openid', 'is_active'])
+            target.openid = openid
+            target.save(update_fields=['openid'])
+
+        refresh = RefreshToken.for_user(target)
+        logger.info('账号关联：current=%s → target=%s', current.id, target.id)
+        data = _me_payload(target)
+        data['token'] = {'refresh': str(refresh), 'access': str(refresh.access_token)}
+        return api_response(data, message='已关联到原账号，账本和流水都在')
 
 
 class WechatOpenidView(APIView):

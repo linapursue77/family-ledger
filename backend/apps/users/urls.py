@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.users.views import (
     BindPhoneView,
+    LinkAccountView,
     LoginView,
     MeView,
     PasswordResetView,
@@ -29,6 +30,8 @@ urlpatterns = [
     path('profile/', ProfileUpdateView.as_view(), name='auth-profile'),
     # 打通两端账号：给微信账号补手机号（顺带可设密码），之后 H5 也能登录
     path('bind-phone/', BindPhoneView.as_view(), name='auth-bind-phone'),
+    # 微信误注册了空账号 → 输入手机号密码，把微信身份迁回老账号
+    path('link-account/', LinkAccountView.as_view(), name='auth-link-account'),
     # 设置 / 修改登录密码：微信一键登录的用户在这里补密码，之后可用手机号登录 H5
     path('password/', PasswordUpdateView.as_view(), name='auth-password'),
     # 忘记密码：短信验证码 → 重置密码

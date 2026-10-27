@@ -279,6 +279,42 @@
       </view>
     </view>
 
+    <!-- 补救：微信误建了空账号时，用手机号密码把微信身份迁回网页版老账号 -->
+    <view wx:if="{{hasWechat && !user.phone}}" class="menu-item" bindtap="openLinkAccount">
+      <text class="menu-icon">🔗</text>
+      <text class="menu-text">关联已有账号</text>
+      <text class="menu-value">网页版注册过？</text>
+      <text class="menu-arrow">{{showLink ? '⌃' : '›'}}</text>
+    </view>
+    <view wx:if="{{showLink}}" class="sub-form">
+      <view class="field-row">
+        <text class="field-label">手机号</text>
+        <input
+          type="number"
+          maxlength="11"
+          placeholder="网页版注册的手机号"
+          value="{{linkPhone}}"
+          bindinput="onLinkPhone"
+        />
+      </view>
+      <view class="field-row">
+        <text class="field-label">密码</text>
+        <input
+          password
+          placeholder="网页版账号的密码"
+          value="{{linkPwd}}"
+          bindinput="onLinkPwd"
+        />
+      </view>
+      <view wx:if="{{linkErr}}" class="form-err">{{linkErr}}</view>
+      <button class="btn-primary {{linkSaving ? 'disabled' : ''}}" bindtap="onSaveLinkAccount">
+        {{linkSaving ? '关联中…' : '关联并切换'}}
+      </button>
+      <view class="form-note">
+        关联后这个微信会直接进入原账号，账本和流水都在。当前这个空账号会被停用，不再占用。
+      </view>
+    </view>
+
     <!-- 账号打通 ②：手机号注册的老用户绑微信，之后可用微信一键登录 -->
     <view class="menu-item" bindtap="onBindWechat">
       <text class="menu-icon">💬</text>
@@ -294,10 +330,7 @@
       <text class="menu-arrow">{{showPwd ? '⌃' : '›'}}</text>
     </view>
     <view wx:if="{{showPwd}}" class="sub-form">
-      <view wx:if="{{hasPassword}}" class="field-row">
-        <text class="field-label">当前密码</text>
-        <input password placeholder="请输入当前密码" value="{{pwdOld}}" bindinput="onPwdOld" />
-      </view>
+      <!-- 已登录状态直接改密码，不问原密码：少一步，也不会因为忘了旧密码卡住 -->
       <view class="field-row">
         <text class="field-label">新密码</text>
         <input password placeholder="字母+数字，至少 6 位" value="{{pwdNew}}" bindinput="onPwdNew" />

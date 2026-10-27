@@ -14,6 +14,7 @@
     <text wx:if="{{!loading}}">微信一键登录</text>
     <text wx:else>登录中…</text>
   </button>
+  <view class="wx-tip">首次使用点这里 · 在网页版注册过请用下面手机号登录</view>
 
   <!-- 手机号快捷验证入口：已屏蔽。
        该能力需「非个人主体 + 已认证 + 已开通付费」，本项目为个人主体（principal_type=0），
@@ -29,7 +30,7 @@
   -->
 
   <view class="divider" bindtap="togglePwd">
-    <text>{{showPwd ? '收起密码登录' : '用手机号密码登录'}}</text>
+    <text>{{showPwd ? '收起手机号登录' : '用手机号密码登录'}}</text>
   </view>
 
   <!-- 兜底入口：老用户/无微信环境 -->
@@ -56,6 +57,5 @@
     <button class="btn-primary {{loading ? 'disabled' : ''}}" bindtap="onLogin">
       {{loading ? '登录中…' : '登 录'}}
     </button>
-    <view class="hint">演示账号：13800138000 / test123456</view>
   </view>
 </view>

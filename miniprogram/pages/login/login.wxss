@@ -50,6 +50,15 @@
 .wx-btn.is-loading {
   opacity: 0.7;
 }
+/* 微信按钮下方的一行指引：明确「新用户才点这里」，避免老用户误建空账号 */
+.wx-tip {
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-muted);
+  line-height: 1.6;
+  padding: 0 40rpx;
+  margin-top: 16rpx;
+}
 .divider {
   text-align: center;
   font-size: 26rpx;

@@ -134,13 +134,14 @@ class PasswordUpdateSerializer(serializers.Serializer):
         user = self.context['user']
         new_pwd = attrs['new_password']
 
+        # ★ 已登录状态下改密码不再强制原密码（产品要求：最小化操作成本）。
+        #   仍然保留校验：前端如果传了 old_password 就核对，传错要报错，
+        #   避免用户以为改成功了、其实填错原密码被静默忽略。
         if user.has_usable_password():
-            if not attrs.get('old_password'):
-                raise serializers.ValidationError('请先填写当前密码')
-            if not user.check_password(attrs['old_password']):
+            if attrs.get('old_password') and not user.check_password(attrs['old_password']):
                 raise serializers.ValidationError('当前密码不正确')
         else:
-            # 无密码用户（纯微信）不校验 old_password，但也不允许误传后静默忽略
+            # 无密码用户（纯微信）本来就没有原密码可校验
             attrs['old_password'] = ''
 
         confirm = attrs.get('confirm_password') or ''

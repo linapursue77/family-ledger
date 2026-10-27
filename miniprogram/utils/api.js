@@ -12,6 +12,8 @@ module.exports = {
   bindPhone: (data) => request('POST', '/auth/bind-phone/', data),
   // 账号打通：把当前微信绑到已登录账号（手机号注册的老用户走这条）
   bindWechat: (data) => request('POST', '/auth/wechat/openid/', data),
+  // 误注册了空账号：输入手机号密码，把微信身份迁回老账号并换发 token
+  linkAccount: (data) => request('POST', '/auth/link-account/', data),
   // 改个人资料：「我的」页的隐私额度走这里，只传 privacy_limit_cents
   updateProfile: (data) => request('PATCH', '/auth/profile/', data),
 
